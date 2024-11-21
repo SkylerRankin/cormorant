@@ -7,14 +7,24 @@ include_directories(include)
 
 # Header files
 set(CXX_HEADERS
-    include/colors.h
+    include/application.h
+    include/filter.h
+    include/frame_buffer.h
+    include/glCommon.h
+    include/image.h
+    include/ui.h
 )
 set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
 
 # Source files
 set(CXX_SRCS
+    application.cpp
+    filter.cpp
+    frame_buffer.cpp
+    image.cpp
     main.cpp
+    ui.cpp
 )
 
 add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS})
-target_link_libraries(cormorant PRIVATE glad glfw imgui)
+target_link_libraries(cormorant PRIVATE glad glfw imgui tinyfiledialogs glm)

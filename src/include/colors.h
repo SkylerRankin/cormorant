@@ -1,1 +1,0 @@
-const int color_test = 1232324;

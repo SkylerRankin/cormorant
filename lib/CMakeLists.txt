@@ -28,6 +28,7 @@ FetchContent_Declare(
 )
 
 FetchContent_GetProperties(glad)
+
 if(NOT glad_POPULATED)
     message("Fetching glad")
     FetchContent_Populate(glad)
@@ -48,6 +49,7 @@ FetchContent_Declare(
 )
 
 FetchContent_GetProperties(imgui)
+
 if(NOT imgui_POPULATED)
     message("Fetching ImGui")
     FetchContent_Populate(imgui)
@@ -68,3 +70,39 @@ if(NOT imgui_POPULATED)
 
     target_link_libraries(imgui PRIVATE glfw)
 endif ()
+
+# ------ tinyfiledialogs --------------------------------------------
+
+add_subdirectory(tinyfiledialogs)
+
+# ------ stb_image --------------------------------------------------
+
+FetchContent_Declare(
+    stb_image
+    GIT_REPOSITORY  https://github.com/nothings/stb.git
+    GIT_TAG         master
+    GIT_SHALLOW     TRUE
+    GIT_PROGRESS    TRUE
+)
+
+FetchContent_GetProperties(stb_image)
+if(NOT stb_image_POPULATED)
+    message("Fetching stb_image")
+    FetchContent_Populate(stb_image)
+    add_library(stb_image INTERFACE ${stb_image_SOURCE_DIR}/stb_image.h)
+    target_include_directories(stb_image INTERFACE ${stb_image_SOURCE_DIR})
+endif()
+
+# ------ glm --------------------------------------------------------
+
+FetchContent_Declare(
+    glm
+    GIT_REPOSITORY https://github.com/g-truc/glm
+    GIT_TAG        1.0.1
+    GIT_SHALLOW    TRUE
+    GIT_PROGRESS   TRUE
+)
+
+message("Fetching glm")
+FetchContent_MakeAvailable(glm)
+target_compile_definitions(glm INTERFACE GLM_FORCE_SILENT_WARNINGS)
