@@ -93,8 +93,12 @@ void UI::renderFrame() {
 	ImGui::End();
 
 	ImGui::Begin("right_panel", nullptr);
+
 	imageTargetSize.x = (int) ImGui::GetContentRegionAvail().x;
 	imageTargetSize.y = (int) ImGui::GetContentRegionAvail().y;
+	imageTargetPosition.x = (int) ImGui::GetWindowPos().x;
+	imageTargetPosition.y = (int)ImGui::GetWindowPos().y;
+
 	ImGui::Image(imageTexture, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 	ImGui::End();
 
@@ -104,6 +108,10 @@ void UI::renderFrame() {
 
 glm::ivec2 UI::getImageTargetSize() const {
 	return imageTargetSize;
+}
+
+glm::ivec2 UI::getImageTargetPosition() const {
+	return imageTargetPosition;
 }
 
 void UI::setImageSelectCallback(std::function<void(std::string)> callback) {

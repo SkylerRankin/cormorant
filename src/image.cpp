@@ -38,7 +38,7 @@ ImageRenderer::ImageRenderer() {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
-	buildPassthroughShaders();
+	buildShaders();
 }
 
 void ImageRenderer::renderFrame() {
@@ -62,6 +62,20 @@ void ImageRenderer::updateTargetSize(glm::ivec2 newSize) {
 	imageTargetSize = newSize;
 	frameBuffer.update(newSize.x, newSize.y);
 	updateBaseImageTransform();
+}
+
+void ImageRenderer::zoom(int amount) {
+	currentZoom += zoomSpeed * amount;
+	if (currentZoom < 1.0f) {
+		currentZoom = 1.0f;
+	}
+	updatePanZoomTransform();
+}
+
+void ImageRenderer::pan(glm::ivec2 offset) {
+	panOffset.x += offset.x / (float)imageTargetSize.x * 2.0f;
+	panOffset.y += -1 * offset.y / (float)imageTargetSize.y * 2.0f;
+	updatePanZoomTransform();
 }
 
 void ImageRenderer::loadImage(std::string path) {
@@ -97,7 +111,7 @@ GLint ImageRenderer::getTextureId() {
 	return frameBuffer.getTextureId();
 }
 
-void ImageRenderer::buildPassthroughShaders() {
+void ImageRenderer::buildShaders() {
 	const char* vertexShaderSource = R"(
 		#version 330 core
 		layout (location = 0) in vec3 position;
@@ -107,7 +121,7 @@ void ImageRenderer::buildPassthroughShaders() {
 		uniform mat4 baseScaleTransform;
 		void main() {
 			uv = in_uv;
-			gl_Position = baseScaleTransform * vec4(position, 1.0);
+			gl_Position = transform * baseScaleTransform * vec4(position, 1.0);
 		}
 	)";
 
@@ -169,7 +183,7 @@ void ImageRenderer::buildPassthroughShaders() {
 	glUseProgram(shaderProgram);
 	glUniform1i(glGetUniformLocation(shaderProgram, "imageTexture"), imageTextureUnit);
 
-	// TODO: move this to the image control callbacks, make a transform to handle zoom/panning
+	// Default identity matrix for the zoom/pan transform
 	glm::mat4 transform = glm::mat4(1.0f);
 	GLuint transformLocation = glGetUniformLocation(shaderProgram, "transform");
 	glUniformMatrix4fv(transformLocation, 1, GL_FALSE, glm::value_ptr(transform));
@@ -202,5 +216,14 @@ void ImageRenderer::updateBaseImageTransform() {
 
 	glUseProgram(shaderProgram);
 	GLuint transformLocation = glGetUniformLocation(shaderProgram, "baseScaleTransform");
+	glUniformMatrix4fv(transformLocation, 1, GL_FALSE, glm::value_ptr(transform));
+}
+
+void ImageRenderer::updatePanZoomTransform() {
+	glUseProgram(shaderProgram);
+	glm::mat4 transform = glm::mat4(1.0f);
+	transform = glm::translate(transform, glm::vec3(panOffset, 0.0f));
+	transform = glm::scale(transform, glm::vec3(currentZoom, currentZoom, 1.0f));
+	GLuint transformLocation = glGetUniformLocation(shaderProgram, "transform");
 	glUniformMatrix4fv(transformLocation, 1, GL_FALSE, glm::value_ptr(transform));
 }

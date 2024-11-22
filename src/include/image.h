@@ -15,6 +15,8 @@ public:
 	ImageRenderer();
 	void renderFrame();
 	void updateTargetSize(glm::ivec2 newSize);
+	void zoom(int amount);
+	void pan(glm::ivec2 offset);
 	void loadImage(std::string path);
 	GLint getTextureId();
 
@@ -23,12 +25,18 @@ private:
 	glm::ivec2 imageSize;
 	FrameBuffer frameBuffer;
 
+	const float zoomSpeed = 0.5f;
+	float currentZoom = 1.0f;
+	glm::ivec2 panStart;
+	glm::vec2 panOffset = glm::vec2(0, 0);
+
 	GLuint shaderProgram;
 	GLuint imageTextureUnit = 1;
 	GLuint imageTexture;
 	RectObject singleImageRect;
 
-	void buildPassthroughShaders();
+	void buildShaders();
 	void renderSingleImage();
 	void updateBaseImageTransform();
+	void updatePanZoomTransform();
 };

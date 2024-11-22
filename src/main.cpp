@@ -11,6 +11,11 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
     app->onKeyPress(key, scancode, action, mods);
 }
 
+static void clickCallback(GLFWwindow* window, int button, int action, int mods) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    app->onClick(button, action, mods);
+}
+
 static void mousePositionCallback(GLFWwindow* window, double x, double y) {
     Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
     app->onMouseMove(x, y);
@@ -19,6 +24,11 @@ static void mousePositionCallback(GLFWwindow* window, double x, double y) {
 static void mouseEnteredCallback(GLFWwindow* window, int entered) {
     Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
     app->onMouseEntered(entered);
+}
+
+static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    app->onScroll(yOffset);
 }
 
 int main() {
@@ -39,8 +49,10 @@ int main() {
     glfwMakeContextCurrent(window);
     glfwSetErrorCallback(errorCallback);
     glfwSetKeyCallback(window, &keyCallback);
+    glfwSetMouseButtonCallback(window, &clickCallback);
     glfwSetCursorPosCallback(window, &mousePositionCallback);
     glfwSetCursorEnterCallback(window, &mouseEnteredCallback);
+    glfwSetScrollCallback(window, &scrollCallback);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
 
     const GLubyte* version = glGetString(GL_VERSION);

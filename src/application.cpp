@@ -36,10 +36,53 @@ void Application::renderFrame() {
 
 void Application::onKeyPress(int key, int scancode, int action, int mods) {}
 
-void Application::onMouseMove(double x, double y) {}
+void Application::onClick(int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            leftClickDown = true;
+            double mouseX, mouseY;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+            leftClickStart = glm::ivec2(mouseX, mouseY);
+            prevMousePosition = glm::ivec2(mouseX, mouseY);
+
+            panningImage = mouseOverlappingImage();
+        } else if (action == GLFW_RELEASE) {
+            leftClickDown = false;
+            panningImage = false;
+        }
+    }
+}
+
+void Application::onMouseMove(double x, double y) {
+    if (leftClickDown) {
+        glm::ivec2 dragOffset = glm::ivec2(x, y) - prevMousePosition;
+        if (panningImage) {
+            imageRenderer->pan(dragOffset);
+        }
+    }
+    prevMousePosition = glm::ivec2(x, y);
+}
 
 void Application::onMouseEntered(int entered) {}
 
 void Application::onWindowResized(int width, int height) {
     glViewport(0, 0, width, height);
 }
+
+void Application::onScroll(int offset) {
+    if (mouseOverlappingImage()) {
+        imageRenderer->zoom(offset);
+    }
+}
+
+bool Application::mouseOverlappingImage() {
+    glm::ivec2 imagePosition = ui->getImageTargetPosition();
+    glm::ivec2 imageSize = ui->getImageTargetSize();
+
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+
+    return imagePosition.x <= mouseX && mouseX <= imagePosition.x + imageSize.x &&
+           imagePosition.y <= mouseY && mouseY <= imagePosition.y + imageSize.y;
+}
+
