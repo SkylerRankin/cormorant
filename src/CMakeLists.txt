@@ -27,4 +27,4 @@ set(CXX_SRCS
 )
 
 add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS})
-target_link_libraries(cormorant PRIVATE glad glfw imgui tinyfiledialogs glm)
+target_link_libraries(cormorant PRIVATE glad glfw imgui tinyfiledialogs glm stb_image)

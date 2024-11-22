@@ -50,7 +50,8 @@ void UI::renderFrame() {
 
 	ImGuiWindowFlags window_flags =
 		ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar |
-		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus |
+		ImGuiWindowFlags_NoNavFocus;
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 	ImGui::Begin("dockspace_window", nullptr, window_flags);
@@ -86,7 +87,7 @@ void UI::renderFrame() {
 	if (ImGui::Button("Load image")) {
 		char const* result = tinyfd_openFileDialog("title", nullptr, 0, nullptr, nullptr, 0);
 		if (result != nullptr) {
-			std::cout << result << std::endl;
+			onImageSelected(result);
 		}
 	}
 	ImGui::End();
@@ -105,3 +106,6 @@ glm::ivec2 UI::getImageTargetSize() const {
 	return imageTargetSize;
 }
 
+void UI::setImageSelectCallback(std::function<void(std::string)> callback) {
+	onImageSelected = callback;
+}

@@ -12,6 +12,7 @@ public:
 	void unbind();
 
 private:
+	const GLuint textureUnit = GL_TEXTURE0;
 	GLuint fbo;
 	GLuint texture;
 	GLuint rbo;

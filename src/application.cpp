@@ -4,6 +4,12 @@
 Application::Application(GLFWwindow* window) : window(window) {
     imageRenderer = new ImageRenderer();
     ui = new UI(window, imageRenderer->getTextureId());
+
+    // Setup UI callbacks
+    ui->setImageSelectCallback([this](std::string path) -> void {
+        imageRenderer->loadImage(path);
+    });
+
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
