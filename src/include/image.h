@@ -28,7 +28,6 @@ private:
 
 	const float zoomSpeed = 0.5f;
 	float currentZoom = 1.0f;
-	glm::ivec2 panStart;
 	glm::vec2 panOffset = glm::vec2(0, 0);
 
 	GLuint shaderProgram;

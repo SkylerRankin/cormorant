@@ -32,7 +32,6 @@ void ImageCache::loadDirectory(std::string path) {
 		fs::path entryPath{ entryPathString };
 
 		if (fs::is_regular_file(entryPath) && entryPath.extension().compare(".JPG") == 0) {
-			std::cout << entryPath.filename() << std::endl;
 			Image image;
 			image.filename = entryPath.filename().string();
 			image.filesize = fs::file_size(entryPath);
@@ -40,8 +39,6 @@ void ImageCache::loadDirectory(std::string path) {
 			images.push_back(image);
 		}
 	}
-
-	std::cout << "images length = " << images.size() << std::endl;
 }
 
 const Image& ImageCache::getImage(int index) const {

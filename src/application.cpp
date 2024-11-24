@@ -9,11 +9,12 @@ Application::Application(GLFWwindow* window) : window(window) {
     // Setup UI callbacks
     ui->setDirectoryOpenedCallback([this](std::string path) -> void {
         cache->loadDirectory(path);
-        imageRenderer->setImage(cache->getImage(0));
         generateGroups(groups, cache->getImages());
     });
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    ui->setImageSelectedCallback([this](int i) -> void {
+        imageRenderer->setImage(cache->getImage(i));
+    });
 }
 
 Application::~Application() {
@@ -26,6 +27,7 @@ void Application::renderFrame() {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     imageRenderer->renderFrame();

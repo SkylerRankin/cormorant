@@ -22,6 +22,7 @@ public:
     glm::ivec2 getImageTargetPosition() const;
 
     void setDirectoryOpenedCallback(std::function<void(std::string)> callback);
+    void setImageSelectedCallback(std::function<void(int)> callback);
 
 private:
     const glm::ivec2 previewImageSize{75, 75};
@@ -32,10 +33,16 @@ private:
     glm::ivec2 imageTargetSize;
     glm::ivec2 imageTargetPosition;
 
-    ControlPanelState controlPanelState = ControlPanel_ShowGroups;
+    ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
+    int selectedGroup;
+    int selectedImage = -1;
 
     void openImageDirectory();
+    void renderControlPanelGroups();
+    void renderControlPanelFiles();
+    std::string bytesToSizeString(int bytes);
 
     // Callbacks
     std::function<void(std::string)> onDirectoryOpened;
+    std::function<void(int)> onImageSelected;
 };

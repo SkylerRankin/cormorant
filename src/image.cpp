@@ -79,6 +79,9 @@ void ImageRenderer::pan(glm::ivec2 offset) {
 void ImageRenderer::setImage(const Image& image) {
 	imageTexture = image.fullTextureId;
 	imageSize = image.size;
+	currentZoom = 1.0f;
+	panOffset = glm::ivec2(0.0f, 0.0f);
+	updatePanZoomTransform();
 	updateBaseImageTransform();
 }
 

@@ -37,15 +37,22 @@ void UI::renderFrame() {
 			if (ImGui::MenuItem("Open")) {
 				openImageDirectory();
 			}
+			ImGui::MenuItem("Save");
             ImGui::MenuItem("Settings");
 			ImGui::Separator();
             ImGui::MenuItem("Exit");
             ImGui::EndMenu();
         }
+		if (ImGui::BeginMenu("Export")) {
+			ImGui::MenuItem("Copy Selections");
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Help")) {
+			ImGui::MenuItem("About");
+			ImGui::EndMenu();
+		}
     }
     ImGui::EndMainMenuBar();
-
-	bool open = true;
 
 	ImGuiViewport* viewport = ImGui::GetMainViewport();
 	ImGui::SetNextWindowPos(viewport->Pos);
@@ -96,103 +103,11 @@ void UI::renderFrame() {
 		ImGui::TextWrapped("To open an image directory, use File > Open.");
 		ImGui::PopStyleColor();
 		break;
-	case ControlPanel_ShowGroups: {
-		if (ImGui::CollapsingHeader("Group Parameters")) {
-			ImGui::BeginTable("parameters_table", 2);
-
-			ImGui::TableSetupColumn("parameter_checkboxes", ImGuiTableColumnFlags_WidthFixed);
-			ImGui::TableSetupColumn("parameter_controls", ImGuiTableColumnFlags_WidthStretch);
-
-			// Row 0
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
-			static bool timeCheck = false;
-			ImGui::Checkbox("Time", &timeCheck);
-			ImGui::Spacing();
-
-			ImGui::TableSetColumnIndex(1);
-			ImGui::SetNextItemWidth(-1);
-			static int timeScale = 10;
-			ImGui::SliderInt("##time", &timeScale, 0, 100, "%d sec", 0);
-
-			// Row 1
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
-			static bool shutterCheck = false;
-			ImGui::Checkbox("Shutter speed", &shutterCheck);
-			ImGui::Spacing();
-
-			ImGui::TableSetColumnIndex(1);
-			ImGui::SetNextItemWidth(-1);
-			static int shutterSpeed = 10;
-			ImGui::SliderInt("##shutterspeed", &shutterSpeed, 0, 100, "%d sec", 0);
-
-			ImGui::EndTable();
-
-			ImGui::Separator();
-
-			ImGui::Button("Regenerate Groups");
-
-			ImGui::Separator();
-		}
-
-		ImGui::Spacing();
-
-		ImGui::Text("%d Groups", groups.size());
-
-		ImGui::Spacing();
-
-		static int hoveredChildIndex = -1;
-		bool anyChildHovered = false;
-
-		for (int i = 0; i < groups.size(); i++) {
-			const Group& group = groups[i];
-			if (hoveredChildIndex == i) {
-				ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(255, 0, 0, 100));
-			}
-
-			ImGui::BeginChild(std::format("group_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
-			if (ImGui::BeginTable(std::format("group_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody)) {
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-
-				unsigned int textureId = imageCache->getImage(group.startIndex).previewTextureId;
-				ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
-
-				ImGui::TableSetColumnIndex(1);
-				ImGui::Text("Group %d", i);
-				ImGui::Separator();
-				ImGui::Text("%d images", group.endIndex - group.startIndex + 1);
-				ImGui::EndTable();
-			}
-
-			ImGui::EndChild();
-
-			if (hoveredChildIndex == i) {
-				ImGui::PopStyleColor();
-			}
-
-			if (ImGui::IsItemHovered()) {
-				ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-			}
-
-			if (ImGui::IsItemHovered()) {
-				hoveredChildIndex = i;
-				anyChildHovered = true;
-			}
-
-			if (ImGui::IsItemClicked()) {
-				std::cout << "Selected group " << i << std::endl;
-			}
-		}
-
-		if (!anyChildHovered) {
-			hoveredChildIndex = -1;
-		}
-
+	case ControlPanel_ShowGroups:
+		renderControlPanelGroups();
 		break;
-	}
 	case ControlPanel_ShowFiles:
+		renderControlPanelFiles();
 		break;
 	}
 
@@ -212,6 +127,182 @@ void UI::renderFrame() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+void UI::renderControlPanelGroups() {
+	if (ImGui::CollapsingHeader("Group Parameters")) {
+		ImGui::BeginTable("parameters_table", 2);
+
+		ImGui::TableSetupColumn("parameter_checkboxes", ImGuiTableColumnFlags_WidthFixed);
+		ImGui::TableSetupColumn("parameter_controls", ImGuiTableColumnFlags_WidthStretch);
+
+		// Row 0
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		static bool timeCheck = false;
+		ImGui::Checkbox("Time", &timeCheck);
+		ImGui::Spacing();
+
+		ImGui::TableSetColumnIndex(1);
+		ImGui::SetNextItemWidth(-1);
+		static int timeScale = 10;
+		ImGui::SliderInt("##time", &timeScale, 0, 100, "%d sec", 0);
+
+		// Row 1
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		static bool shutterCheck = false;
+		ImGui::Checkbox("Shutter speed", &shutterCheck);
+		ImGui::Spacing();
+
+		ImGui::TableSetColumnIndex(1);
+		ImGui::SetNextItemWidth(-1);
+		static int shutterSpeed = 10;
+		ImGui::SliderInt("##shutterspeed", &shutterSpeed, 0, 100, "%d sec", 0);
+
+		ImGui::EndTable();
+
+		ImGui::Separator();
+
+		ImGui::Button("Regenerate Groups");
+
+		ImGui::Separator();
+	}
+
+	ImGui::Spacing();
+
+	ImGui::Text("%d Groups", groups.size());
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(168, 143, 50, 255));
+	ImGui::TextWrapped("4 groups with 0 selections");
+	ImGui::PopStyleColor();
+
+	ImGui::Spacing();
+
+	static int hoveredChildIndex = -1;
+	bool anyChildHovered = false;
+
+	for (int i = 0; i < groups.size(); i++) {
+		const Group& group = groups[i];
+		if (hoveredChildIndex == i) {
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
+		}
+
+		ImGui::BeginChild(std::format("group_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+		if (ImGui::BeginTable(std::format("group_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody)) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+
+			unsigned int textureId = imageCache->getImage(group.startIndex).previewTextureId;
+			ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("Group %d", i);
+			ImGui::Separator();
+			ImGui::Text("%d images", group.endIndex - group.startIndex + 1);
+			ImGui::EndTable();
+		}
+
+		ImGui::EndChild();
+
+		if (hoveredChildIndex == i) {
+			ImGui::PopStyleColor();
+		}
+
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		}
+
+		if (ImGui::IsItemHovered()) {
+			hoveredChildIndex = i;
+			anyChildHovered = true;
+		}
+
+		if (ImGui::IsItemClicked()) {
+			selectedGroup = i;
+			controlPanelState = ControlPanel_ShowFiles;
+		}
+	}
+
+	if (!anyChildHovered) {
+		hoveredChildIndex = -1;
+	}
+}
+
+void UI::renderControlPanelFiles() {
+	if (ImGui::Button("Return to groups")) {
+		controlPanelState = ControlPanel_ShowGroups;
+		selectedImage = -1;
+	}
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	ImGui::Text("Group %d", selectedGroup);
+	ImGui::Spacing();
+
+	static int hoveredChildIndex = -1;
+	bool anyChildHovered = false;
+
+	for (int i = groups[selectedGroup].startIndex; i <= groups[selectedGroup].endIndex; i++) {
+		if (i == selectedImage) {
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 255));
+		} else if (i == hoveredChildIndex) {
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
+		}
+
+		ImGui::BeginChild(std::format("file_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+		if (ImGui::BeginTable(std::format("file_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody)) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+
+			const Image& image = imageCache->getImage(i);
+			ImGui::Image(image.previewTextureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text(image.filename.c_str());
+			ImGui::Separator();
+			ImGui::Text(bytesToSizeString(image.filesize).c_str());
+			ImGui::Text("%d x %d", image.size.x, image.size.y);
+			ImGui::Text("11:59 12/12/1804");
+
+			ImGui::EndTable();
+		}
+
+		ImGui::EndChild();
+
+		if (i == hoveredChildIndex || i == selectedImage) {
+			ImGui::PopStyleColor();
+		}
+
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		}
+
+		if (ImGui::IsItemHovered()) {
+			hoveredChildIndex = i;
+			anyChildHovered = true;
+		}
+
+		if (ImGui::IsItemClicked()) {
+			selectedImage = i;
+			onImageSelected(i);
+		}
+	}
+
+	if (!anyChildHovered) {
+		hoveredChildIndex = -1;
+	}
+}
+
+std::string UI::bytesToSizeString(int bytes) {
+	if (bytes < 1024) {
+		return std::format("{} bytes", bytes);
+	} else if (bytes < 1024 * 1024) {
+		return std::format("{} KB", floor(bytes / 1024));
+	} else {
+		return std::format("{} MB", floor(bytes / 1024 / 1024));
+	}
+}
+
 glm::ivec2 UI::getImageTargetSize() const {
 	return imageTargetSize;
 }
@@ -225,11 +316,15 @@ void UI::openImageDirectory() {
 	char const* result = tinyfd_selectFolderDialog("Image directory", nullptr);
 	
 	if (result != nullptr) {
-		std::cout << result << std::endl;
+		controlPanelState = ControlPanel_ShowGroups;
 		onDirectoryOpened(result);
 	}
 }
 
 void UI::setDirectoryOpenedCallback(std::function<void(std::string)> callback) {
 	onDirectoryOpened = callback;
+}
+
+void UI::setImageSelectedCallback(std::function<void(int)> callback) {
+	onImageSelected = callback;
 }
