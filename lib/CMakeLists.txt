@@ -89,7 +89,7 @@ FetchContent_GetProperties(stb_image)
 if(NOT stb_image_POPULATED)
     message("Fetching stb_image")
     FetchContent_Populate(stb_image)
-    add_library(stb_image INTERFACE ${stb_image_SOURCE_DIR}/stb_image.h)
+    add_library(stb_image INTERFACE ${stb_image_SOURCE_DIR}/stb_image.h ${stb_image_SOURCE_DIR}/stb_image_resize2.h)
     target_include_directories(stb_image INTERFACE ${stb_image_SOURCE_DIR})
 endif()
 

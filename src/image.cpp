@@ -1,8 +1,6 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
 #include "image.h"
 
 ImageRenderer::ImageRenderer() {
@@ -78,32 +76,9 @@ void ImageRenderer::pan(glm::ivec2 offset) {
 	updatePanZoomTransform();
 }
 
-void ImageRenderer::loadImage(std::string path) {
-	stbi_set_flip_vertically_on_load(true);
-	int width, height, channels;
-	u8* imageData = stbi_load(path.c_str(), &width, &height, &channels, 0);
-	if (imageData == nullptr) {
-		std::cout << "Failed to load image " << path << std::endl;
-		return;
-	}
-
-	std::cout << "Loaded image: size=(" << width << ", " << height << "), " << channels << " channels" << std::endl;
-	imageSize = glm::ivec2(width, height);
-
-	glGenTextures(1, &imageTexture);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, imageTexture);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	stbi_image_free(imageData);
-
+void ImageRenderer::setImage(const Image& image) {
+	imageTexture = image.fullTextureId;
+	imageSize = image.size;
 	updateBaseImageTransform();
 }
 

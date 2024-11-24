@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
+#include "cache.h"
 #include "glCommon.h"
 #include "frame_buffer.h"
 
@@ -17,7 +18,7 @@ public:
 	void updateTargetSize(glm::ivec2 newSize);
 	void zoom(int amount);
 	void pan(glm::ivec2 offset);
-	void loadImage(std::string path);
+	void setImage(const Image& image);
 	GLint getTextureId();
 
 private:

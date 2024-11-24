@@ -1,7 +1,10 @@
 #pragma once
+#include <vector>
+#include "cache.h"
 #include "glCommon.h"
 #include "image.h"
 #include "ui.h"
+#include "group.h"
 
 class Application {
 public:
@@ -20,6 +23,8 @@ private:
 	GLFWwindow* window;
 	ImageRenderer* imageRenderer;
 	UI* ui;
+	ImageCache* cache;
+	std::vector<Group> groups;
 
 	// Input state
 	bool leftClickDown = false;

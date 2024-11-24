@@ -8,7 +8,8 @@ include_directories(include)
 # Header files
 set(CXX_HEADERS
     include/application.h
-    include/filter.h
+    include/cache.h
+    include/group.h
     include/frame_buffer.h
     include/glCommon.h
     include/image.h
@@ -19,7 +20,8 @@ set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
 # Source files
 set(CXX_SRCS
     application.cpp
-    filter.cpp
+    cache.cpp
+    group.cpp
     frame_buffer.cpp
     image.cpp
     main.cpp

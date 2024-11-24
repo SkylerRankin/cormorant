@@ -3,11 +3,14 @@
 
 Application::Application(GLFWwindow* window) : window(window) {
     imageRenderer = new ImageRenderer();
-    ui = new UI(window, imageRenderer->getTextureId());
+    cache = new ImageCache();
+    ui = new UI(window, imageRenderer->getTextureId(), groups, cache);
 
     // Setup UI callbacks
-    ui->setImageSelectCallback([this](std::string path) -> void {
-        imageRenderer->loadImage(path);
+    ui->setDirectoryOpenedCallback([this](std::string path) -> void {
+        cache->loadDirectory(path);
+        imageRenderer->setImage(cache->getImage(0));
+        generateGroups(groups, cache->getImages());
     });
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);

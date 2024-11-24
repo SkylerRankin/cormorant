@@ -28,7 +28,7 @@ static void mouseEnteredCallback(GLFWwindow* window, int entered) {
 
 static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
     Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    app->onScroll(yOffset);
+    app->onScroll((int) yOffset);
 }
 
 int main() {
