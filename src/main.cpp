@@ -62,7 +62,7 @@ int main() {
     glfwSetWindowUserPointer(window, &app);
 
     while (!glfwWindowShouldClose(window)) {
-        app.renderFrame();
+        app.frameUpdate();
     }
     
     glfwTerminate();

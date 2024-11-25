@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <vector>
 #include "cache.h"
 #include "glCommon.h"
@@ -6,11 +7,18 @@
 #include "ui.h"
 #include "group.h"
 
+enum ProcessingState {
+	ProcessingState_None = 0,
+	ProcessingState_LoadingDirectory = 1,
+	ProcessingState_LoadingImages = 2,
+	ProcessingState_GeneratingGroups = 3,
+};
+
 class Application {
 public:
 	Application(GLFWwindow* window);
 	~Application();
-	void renderFrame();
+	void frameUpdate();
 
 	void onKeyPress(int key, int scancode, int action, int mods);
 	void onMouseMove(double x, double y);
@@ -31,6 +39,10 @@ private:
 	bool panningImage = false;
 	glm::ivec2 prevMousePosition;
 	glm::ivec2 leftClickStart;
+
+	// Data processing
+	ProcessingState processingState = ProcessingState_None;
+	std::atomic_bool directoryLoaded;
 
 	bool mouseOverlappingImage();
 

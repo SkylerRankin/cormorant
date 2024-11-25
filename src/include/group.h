@@ -1,7 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <string>
-#include <vector>
+#include <map>
 #include "cache.h"
 
 struct Group {
@@ -9,4 +9,5 @@ struct Group {
 	int endIndex = -1;
 };
 
-void generateGroups(std::vector<Group>& groups, const std::vector<Image>& images);
+void generateInitialGroup(std::vector<Group>& groups, const std::map<int, Image>& images);
+void generateGroups(std::vector<Group>& groups, const std::map<int, Image>& images);

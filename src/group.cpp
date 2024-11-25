@@ -1,6 +1,14 @@
 #include "group.h"
 
-void generateGroups(std::vector<Group>& groups, const std::vector<Image>& images) {
+void generateInitialGroup(std::vector<Group>& groups, const std::map<int, Image>& images) {
+	groups.clear();
+	Group initialGroup;
+	initialGroup.startIndex = 0;
+	initialGroup.endIndex = images.size() - 1;
+	groups.push_back(initialGroup);
+}
+
+void generateGroups(std::vector<Group>& groups, const std::map<int, Image>& images) {
 	int groupSize = 4;
 
 	groups.clear();

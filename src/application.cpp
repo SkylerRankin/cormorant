@@ -6,10 +6,12 @@ Application::Application(GLFWwindow* window) : window(window) {
     cache = new ImageCache();
     ui = new UI(window, imageRenderer->getTextureId(), groups, cache);
 
+    directoryLoaded.store(false);
+
     // Setup UI callbacks
     ui->setDirectoryOpenedCallback([this](std::string path) -> void {
-        cache->loadDirectory(path);
-        generateGroups(groups, cache->getImages());
+        processingState = ProcessingState_LoadingDirectory;
+        cache->initCacheFromDirectory(path, directoryLoaded);
     });
 
     ui->setImageSelectedCallback([this](int i) -> void {
@@ -19,16 +21,19 @@ Application::Application(GLFWwindow* window) : window(window) {
 
 Application::~Application() {
     delete imageRenderer;
+    delete cache;
     delete ui;
 }
 
-void Application::renderFrame() {
+void Application::frameUpdate() {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    cache->frameUpdate();
 
     imageRenderer->renderFrame();
     ui->renderFrame();
@@ -37,6 +42,20 @@ void Application::renderFrame() {
     glfwPollEvents();
 
     imageRenderer->updateTargetSize(ui->getImageTargetSize());
+
+    switch (processingState) {
+    case ProcessingState_LoadingDirectory:
+        if (directoryLoaded.load()) {
+            directoryLoaded.store(false);
+            processingState = ProcessingState_None;
+            generateInitialGroup(groups, cache->getImages());
+        }
+        break;
+    case ProcessingState_LoadingImages:
+        break;
+    case ProcessingState_GeneratingGroups:
+        break;
+    }
 }
 
 void Application::onKeyPress(int key, int scancode, int action, int mods) {}

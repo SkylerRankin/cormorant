@@ -35,7 +35,7 @@ void UI::renderFrame() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem("Open")) {
-				openImageDirectory();
+				openDirectoryPicker = true;
 			}
 			ImGui::MenuItem("Save");
             ImGui::MenuItem("Settings");
@@ -125,6 +125,15 @@ void UI::renderFrame() {
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+	if (openDirectoryPicker) {
+		openDirectoryPicker = false;
+		char const* result = tinyfd_selectFolderDialog("Image directory", nullptr);
+		if (result != nullptr) {
+			controlPanelState = ControlPanel_ShowGroups;
+			onDirectoryOpened(result);
+		}
+	}
 }
 
 void UI::renderControlPanelGroups() {
@@ -169,9 +178,13 @@ void UI::renderControlPanelGroups() {
 
 	ImGui::Spacing();
 
-	ImGui::Text("%d Groups", groups.size());
+	if (groups.size() == 1) {
+		ImGui::Text("1 Group");
+	} else {
+		ImGui::Text("%d Groups", groups.size());
+	}
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(168, 143, 50, 255));
-	ImGui::TextWrapped("4 groups with 0 selections");
+	ImGui::TextWrapped("? groups with 0 selections");
 	ImGui::PopStyleColor();
 
 	ImGui::Spacing();
@@ -186,19 +199,19 @@ void UI::renderControlPanelGroups() {
 		}
 
 		ImGui::BeginChild(std::format("group_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
-		if (ImGui::BeginTable(std::format("group_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody)) {
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
 
-			unsigned int textureId = imageCache->getImage(group.startIndex).previewTextureId;
-			ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
+		ImGui::BeginTable(std::format("group_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody);
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
 
-			ImGui::TableSetColumnIndex(1);
-			ImGui::Text("Group %d", i);
-			ImGui::Separator();
-			ImGui::Text("%d images", group.endIndex - group.startIndex + 1);
-			ImGui::EndTable();
-		}
+		unsigned int textureId = imageCache->getImage(group.startIndex).previewTextureId;
+		ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
+
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text("Group %d", i);
+		ImGui::Separator();
+		ImGui::Text("%d images", group.endIndex - group.startIndex + 1);
+		ImGui::EndTable();
 
 		ImGui::EndChild();
 
@@ -255,13 +268,19 @@ void UI::renderControlPanelFiles() {
 			ImGui::TableSetColumnIndex(0);
 
 			const Image& image = imageCache->getImage(i);
+			// TODO: choose texture id based on image status. completed image is the preview texture,
+			//	loading image is some loading texture, failed is some error texture
 			ImGui::Image(image.previewTextureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
 
 			ImGui::TableSetColumnIndex(1);
 			ImGui::Text(image.filename.c_str());
 			ImGui::Separator();
 			ImGui::Text(bytesToSizeString(image.filesize).c_str());
-			ImGui::Text("%d x %d", image.size.x, image.size.y);
+			if (image.status == ImageStatus_Loaded) {
+				ImGui::Text("%d x %d", image.size.x, image.size.y);
+			} else {
+				ImGui::Text("Size unknown");
+			}
 			ImGui::Text("11:59 12/12/1804");
 
 			ImGui::EndTable();
@@ -309,16 +328,6 @@ glm::ivec2 UI::getImageTargetSize() const {
 
 glm::ivec2 UI::getImageTargetPosition() const {
 	return imageTargetPosition;
-}
-
-void UI::openImageDirectory() {
-	//char const* result = tinyfd_openFileDialog("Image directory", nullptr, 0, nullptr, nullptr, 1);
-	char const* result = tinyfd_selectFolderDialog("Image directory", nullptr);
-	
-	if (result != nullptr) {
-		controlPanelState = ControlPanel_ShowGroups;
-		onDirectoryOpened(result);
-	}
 }
 
 void UI::setDirectoryOpenedCallback(std::function<void(std::string)> callback) {

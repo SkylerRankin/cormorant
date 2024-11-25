@@ -32,12 +32,12 @@ private:
     const ImageCache* imageCache;
     glm::ivec2 imageTargetSize;
     glm::ivec2 imageTargetPosition;
+    bool openDirectoryPicker = false;
 
     ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
     int selectedGroup;
     int selectedImage = -1;
 
-    void openImageDirectory();
     void renderControlPanelGroups();
     void renderControlPanelFiles();
     std::string bytesToSizeString(int bytes);
