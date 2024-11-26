@@ -76,9 +76,8 @@ void ImageRenderer::pan(glm::ivec2 offset) {
 	updatePanZoomTransform();
 }
 
-void ImageRenderer::setImage(const Image& image) {
-	imageTexture = image.fullTextureId;
-	imageSize = image.size;
+void ImageRenderer::setImage(const Image* image) {
+	this->image = image;
 	currentZoom = 1.0f;
 	panOffset = glm::ivec2(0.0f, 0.0f);
 	updatePanZoomTransform();
@@ -171,8 +170,13 @@ void ImageRenderer::buildShaders() {
 }
 
 void ImageRenderer::renderSingleImage() {
+	// TODO: when image is not available, maybe render some other loading image instead of nothing?
+	if (image == nullptr || !image->imageLoaded) {
+		return;
+	}
+
 	glActiveTexture(GL_TEXTURE0 + imageTextureUnit);
-	glBindTexture(GL_TEXTURE_2D, imageTexture);
+	glBindTexture(GL_TEXTURE_2D, image->fullTextureId);
 
 	glBindVertexArray(singleImageRect.vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -180,8 +184,12 @@ void ImageRenderer::renderSingleImage() {
 }
 
 void ImageRenderer::updateBaseImageTransform() {
+	if (image == nullptr) {
+		return;
+	}
+
 	float windowAspectRatio = (float) imageTargetSize.x / imageTargetSize.y;
-	float imageAspectRatio = (float) imageSize.x / imageSize.y;
+	float imageAspectRatio = (float) image->size.x / image->size.y;
 
 	glm::mat4 transform = glm::mat4(1.0f);
 	if (windowAspectRatio > imageAspectRatio) {

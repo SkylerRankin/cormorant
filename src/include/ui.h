@@ -15,7 +15,7 @@ enum ControlPanelState {
 
 class UI {
 public:
-    UI(GLFWwindow* window, GLuint imageTexture, const std::vector<Group>& groups, const ImageCache* imageCache);
+    UI(GLFWwindow* window, GLuint imageTexture, const std::vector<Group>& groups, ImageCache* imageCache);
     ~UI();
     void renderFrame();
     glm::ivec2 getImageTargetSize() const;
@@ -29,7 +29,7 @@ private:
 
     GLuint imageTexture;
     const std::vector<Group>& groups;
-    const ImageCache* imageCache;
+    ImageCache* imageCache;
     glm::ivec2 imageTargetSize;
     glm::ivec2 imageTargetPosition;
     bool openDirectoryPicker = false;

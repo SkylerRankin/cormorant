@@ -7,7 +7,7 @@
 #include "imgui_impl_opengl3.h"
 #include <tinyfiledialogs.h>
 
-UI::UI(GLFWwindow* window, GLuint imageTexture, const std::vector<Group>& groups, const ImageCache* imageCache)
+UI::UI(GLFWwindow* window, GLuint imageTexture, const std::vector<Group>& groups, ImageCache* imageCache)
 	: imageTexture(imageTexture), imageTargetSize(glm::ivec2(0, 0)), groups(groups), imageCache(imageCache) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -204,7 +204,7 @@ void UI::renderControlPanelGroups() {
 		ImGui::TableNextRow();
 		ImGui::TableSetColumnIndex(0);
 
-		unsigned int textureId = imageCache->getImage(group.startIndex).previewTextureId;
+		unsigned int textureId = imageCache->getImage(group.startIndex)->previewTextureId;
 		ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
 
 		ImGui::TableSetColumnIndex(1);
@@ -267,17 +267,17 @@ void UI::renderControlPanelFiles() {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 
-			const Image& image = imageCache->getImage(i);
+			const Image* image = imageCache->getImage(i);
 			// TODO: choose texture id based on image status. completed image is the preview texture,
 			//	loading image is some loading texture, failed is some error texture
-			ImGui::Image(image.previewTextureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
+			ImGui::Image(image->previewTextureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
 
 			ImGui::TableSetColumnIndex(1);
-			ImGui::Text(image.filename.c_str());
+			ImGui::Text(image->filename.c_str());
 			ImGui::Separator();
-			ImGui::Text(bytesToSizeString(image.filesize).c_str());
-			if (image.status == ImageStatus_Loaded) {
-				ImGui::Text("%d x %d", image.size.x, image.size.y);
+			ImGui::Text(bytesToSizeString(image->filesize).c_str());
+			if (image->fileInfoLoaded) {
+				ImGui::Text("%d x %d", image->size.x, image->size.y);
 			} else {
 				ImGui::Text("Size unknown");
 			}

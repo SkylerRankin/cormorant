@@ -3,6 +3,7 @@
 #include "cache.h"
 #include "glCommon.h"
 #include "frame_buffer.h"
+#include "cache.h"
 
 #define u8 unsigned char
 
@@ -18,7 +19,7 @@ public:
 	void updateTargetSize(glm::ivec2 newSize);
 	void zoom(int amount);
 	void pan(glm::ivec2 offset);
-	void setImage(const Image& image);
+	void setImage(const Image* image);
 	GLint getTextureId();
 
 private:
@@ -32,7 +33,7 @@ private:
 
 	GLuint shaderProgram;
 	GLuint imageTextureUnit = 1;
-	GLuint imageTexture;
+	const Image* image = nullptr;
 	RectObject singleImageRect;
 
 	void buildShaders();

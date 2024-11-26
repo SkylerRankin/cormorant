@@ -7,15 +7,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-enum ImageStatus {
-	ImageStatus_NotLoaded = 0,
-	ImageStatus_Loading = 1,
-	ImageStatus_Loaded = 2,
-	ImageStatus_Failed = 3
-};
-
 struct Image {
-	ImageStatus status = ImageStatus_NotLoaded;
 	int id = -1;
 	std::string filename;
 	std::string path;
@@ -25,6 +17,10 @@ struct Image {
 	unsigned int timestamp;
 	unsigned int previewTextureId;
 	unsigned int fullTextureId;
+	// Flags are true if the texture is available on GPU
+	bool previewLoaded = false;
+	bool imageLoaded = false;
+	bool fileInfoLoaded = false;
 };
 
 struct ImageQueueEntry {
@@ -39,13 +35,22 @@ struct TextureQueueEntry {
 	unsigned char* previewData;
 };
 
+struct LRUNode {
+	int imageID;
+	LRUNode* next;
+	LRUNode* prev;
+};
+
 class ImageCache {
 public:
 	ImageCache();
 	~ImageCache();
 
 	void frameUpdate();
-	const Image& getImage(int index) const;
+	// Returns an image, but this image is not used in the context of the LRU cache.
+	const Image* getImage(int id);
+	// Returns an image and updates the LRU cache entry for the image.
+	const Image* getImageWithCacheUpdate(int id);
 	/*
 	Initializes the cache to have an entry for every valid image file in the given directory. Full resolution
 	image data is loaded for each image up until the cache is full, at which point only preview images are
@@ -55,7 +60,7 @@ public:
 	const std::map<int, Image>& getImages() const;
 
 private:
-	// Max full resolution images to keep in cache at a time
+	// Max full resolution images to keep stored in GPU at a time
 	const int cacheCapacity = 10;
 	const int defaultImageLoadThreads = 1;
 	const int textureQueueEntriesPerFrame = 1;
@@ -73,12 +78,19 @@ private:
 	std::mutex textureQueueMutex;
 	std::mutex imageQueueConditionVariableMutex;
 	std::condition_variable imageQueueConditionVariable;
+	LRUNode* lruHead = nullptr;
+	LRUNode* lruEnd = nullptr;
+	std::map<int, LRUNode*> imageToLRUNode;
+
+	// LRU interaction functions
+	void useLRUNode(LRUNode* node);
+	void addLRUNode(int id);
+	void evictOldestImage();
 
 	void startImageLoadingThreads();
 	void processTextureQueue();
 	void threadInitCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded);
 	void runImageLoadThread(int id);
-	void loadDirectory(std::string path, std::atomic_bool& directoryLoaded);
 	/*
 	Loads an image file for the given image id. This file is then decoded and stored in a buffer,
 	which `imageData` is updated to point to. The image is also resized to the preview size, and stored in a buffer
@@ -92,6 +104,5 @@ private:
 	full resolution. `previewData` will be set to a null pointer.
 	*/
 	bool loadImageFromFile(int id, unsigned char*& imageData, unsigned char*& previewData, bool skipFullResolution, bool skipPreview);
-	void loadImageRange(int start, int end);
 
 };

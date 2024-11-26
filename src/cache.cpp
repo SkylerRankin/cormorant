@@ -76,21 +76,21 @@ void ImageCache::threadInitCacheFromDirectory(std::string path, std::atomic_bool
 	}
 	directoryLoaded.store(true);
 
-	// Add first n images to queue for full processing, and the remaining images
+	// Add enough images for full processing to saturate cache, and then add the remaining images
 	// for just preview processing.
+	int id = 0;
+	while (id < cacheCapacity && id < images.size()) {
+		getImageWithCacheUpdate(id);
+		id++;
+	}
+
 	std::lock_guard<std::mutex> guard(imageQueueMutex);
-	int i = 0;
-	while (i < cacheCapacity && i < images.size()) {
-		ImageQueueEntry entry{ i, true, true };
+	while (id < images.size()) {
+		ImageQueueEntry entry{ id, false, true };
 		imageQueue.push_back(entry);
-		i++;
+		id++;
 	}
-	while (i < images.size()) {
-		ImageQueueEntry entry{ i, false, true };
-		imageQueue.push_back(entry);
-		i++;
-	}
-	std::cout << "notifing condition var, image queue size = " << imageQueue.size() << std::endl;
+
 	imageQueueConditionVariable.notify_all();
 }
 
@@ -98,41 +98,36 @@ void ImageCache::runImageLoadThread(int id) {
 	while (runImageLoadThreads.load()) {
 		// Wait for condition variable signal
 		std::unique_lock<std::mutex> lock(imageQueueMutex);
-		std::cout << "thread " << id << " waiting" << std::endl;
 		imageQueueConditionVariable.wait(lock);
-		std::cout << "thread " << id << " notified" << std::endl;
 		lock.unlock();
 
+		// Pull items from image queue as long as there are more entries
 		while (true) {
 			ImageQueueEntry entry;
 			{
 				std::lock_guard<std::mutex> guard(imageQueueMutex);
 				if (imageQueue.size() == 0) {
-					std::cout << "thread " << id << " nothing left in queue, exiting" << std::endl;
+					// No more entries in image queue, break and go back to waiting on condition
 					break;
 				} else {
 					entry = imageQueue.front();
 					imageQueue.pop_front();
-					std::cout << "thread " << id << " processing image " << entry.imageID << " new queue size = " << imageQueue.size() << std::endl;
 				}
 			}
 
 			unsigned char* imageData;
 			unsigned char* previewData;
 
-			// TODO: is this thread safe? image with that id might have been deleted from cache while loading from file
-			images.at(entry.imageID).status = ImageStatus_Loading;
 			if (loadImageFromFile(entry.imageID, imageData, previewData, !entry.loadFullTexture, !entry.loadPreviewTexture)) {
-				// TODO: the image data is loaded, but its not yet available on the GPU. this status shouldnt be called loaded
-				images.at(entry.imageID).status = ImageStatus_Loaded;
-
 				TextureQueueEntry textureQueueEntry{ entry.imageID, imageData, previewData };
 				{
 					std::lock_guard<std::mutex> guard(textureQueueMutex);
 					textureQueue.push_back(textureQueueEntry);
 				}
 			} else {
-				images.at(entry.imageID).status = ImageStatus_Failed;
+				// TODO: is this thread safe?
+				images.at(entry.imageID).imageLoaded = false;
+				images.at(entry.imageID).previewLoaded = false;
 			}
 		}
 	}
@@ -145,6 +140,7 @@ bool ImageCache::loadImageFromFile(int id, unsigned char*& imageData, unsigned c
 	imageData = stbi_load(image->path.c_str(), &width, &height, &channels, 3);
 	image->size = glm::ivec2(width, height);
 	image->previewSize = previewTextureSize;
+	image->fileInfoLoaded = true;
 
 	if (imageData == nullptr) {
 		std::cout << "Failed to load image " << image->path << std::endl;
@@ -210,10 +206,6 @@ bool ImageCache::loadImageFromFile(int id, unsigned char*& imageData, unsigned c
 	return true;
 }
 
-const Image& ImageCache::getImage(int index) const {
-	return images.at(index);
-}
-
 void ImageCache::processTextureQueue() {
 	for (int i = 0; i < textureQueue.size() && i < textureQueueEntriesPerFrame; i++) {
 		TextureQueueEntry entry;
@@ -226,37 +218,140 @@ void ImageCache::processTextureQueue() {
 		Image& image = images.at(entry.imageID);
 
 		// Create texture for full resolution image
-		glGenTextures(1, &image.fullTextureId);
-		glBindTexture(GL_TEXTURE_2D, image.fullTextureId);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.size.x, image.size.y, 0, GL_RGB, GL_UNSIGNED_BYTE, entry.imageData);
-		glBindTexture(GL_TEXTURE_2D, 0);
-
-		// Create texture for previous image
-		glGenTextures(1, &image.previewTextureId);
-		glBindTexture(GL_TEXTURE_2D, image.previewTextureId);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.previewSize.x, image.previewSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, entry.previewData);
-		glBindTexture(GL_TEXTURE_2D, 0);
-
 		if (entry.imageData != nullptr) {
+			glGenTextures(1, &image.fullTextureId);
+			glBindTexture(GL_TEXTURE_2D, image.fullTextureId);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.size.x, image.size.y, 0, GL_RGB, GL_UNSIGNED_BYTE, entry.imageData);
+			glBindTexture(GL_TEXTURE_2D, 0);
 			stbi_image_free(entry.imageData);
+			image.imageLoaded = true;
 		}
+
+		// Create texture for preview image
 		if (entry.previewData != nullptr) {
+			glGenTextures(1, &image.previewTextureId);
+			glBindTexture(GL_TEXTURE_2D, image.previewTextureId);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.previewSize.x, image.previewSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, entry.previewData);
+			glBindTexture(GL_TEXTURE_2D, 0);
 			delete[] entry.previewData;
+			image.previewLoaded = true;
 		}
-		image.status = ImageStatus_Loaded;
 	}
+}
+
+const Image* ImageCache::getImage(int id) {
+	return &images.at(id);
+}
+
+const Image* ImageCache::getImageWithCacheUpdate(int id) {
+	assert(images.contains(id) && std::format("Image cache has no entry for id {}", id).c_str());
+
+	const Image& image = images.at(id);
+
+	if (!image.imageLoaded) {
+		// This image does not have a full resolution texture loaded. Add it
+		// to the image loading queue. Only one thread needs to be notified to
+		// process this entry.
+		std::lock_guard<std::mutex> guard(imageQueueMutex);
+		ImageQueueEntry entry{ id, true, !image.previewLoaded };
+		imageQueue.push_back(entry);
+		imageQueueConditionVariable.notify_one();
+	}
+
+	if (imageToLRUNode.contains(id)) {
+		// This image is already somewhere in the LRU list. Move it to the end, making it
+		// the new most recently used image.
+		useLRUNode(imageToLRUNode.at(id));
+	} else {
+		// This image is not in the LRU list. Add it to the end and evict the oldest image
+		// if necessary.
+		if (imageToLRUNode.size() == cacheCapacity) {
+			evictOldestImage();
+		}
+		addLRUNode(id);
+	}
+
+	return &image;
+}
+
+void ImageCache::addLRUNode(int id) {
+	LRUNode* node = new LRUNode();
+	node->imageID = id;
+	node->next = nullptr;
+	node->prev = lruEnd;
+
+	if (lruEnd == nullptr) {
+		lruEnd = node;
+		lruHead = node;
+	} else {
+		lruEnd->next = node;
+		lruEnd = node;
+	}
+
+	imageToLRUNode.emplace(id, node);
+}
+
+void ImageCache::useLRUNode(LRUNode* node) {
+	if (node == lruEnd) {
+		// Node is already at the end of the list, nothing to do.
+		return;
+	}
+
+	// Remove node from its position
+	if (node == lruHead) {
+		// Node is first in list
+		lruHead = node->next;
+		lruHead->prev = nullptr;
+	} else {
+		// Node has other nodes before and after
+		node->prev->next = node->next;
+		node->next->prev = node->prev;
+	}
+
+	node->next = nullptr;
+	node->prev = nullptr;
+
+	// Add node to the end of LRU list
+	lruEnd->next = node;
+	node->prev = lruEnd;
+	lruEnd = node;
+}
+
+void ImageCache::evictOldestImage() {
+	if (lruHead == nullptr) {
+		return;
+	}
+
+	int removedID = lruHead->imageID;
+	// TODO: probably not thread safe, should lock when modifying images map
+	Image& image = images.at(removedID);
+	image.imageLoaded = false;
+	glDeleteTextures(1, &image.fullTextureId);
+
+	imageToLRUNode.erase(removedID);
+
+	LRUNode* originalHead = lruHead;
+	if (lruHead == lruEnd) {
+		lruHead = nullptr;
+		lruEnd = nullptr;
+	} else {
+		lruHead = lruHead->next;
+		lruHead->prev = nullptr;
+	}
+
+	delete originalHead;
 }

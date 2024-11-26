@@ -15,7 +15,7 @@ Application::Application(GLFWwindow* window) : window(window) {
     });
 
     ui->setImageSelectedCallback([this](int i) -> void {
-        imageRenderer->setImage(cache->getImage(i));
+        imageRenderer->setImage(cache->getImageWithCacheUpdate(i));
     });
 }
 
