@@ -281,7 +281,13 @@ void UI::renderControlPanelFiles() {
 			} else {
 				ImGui::Text("Size unknown");
 			}
-			ImGui::Text("11:59 12/12/1804");
+
+			if (image->metadata.timestamp.has_value()) {
+				ImageTimestamp t = image->metadata.timestamp.value();
+				ImGui::Text(std::format("{}:{:0>2} {}/{}/{}", t.hour, t.minute, t.month, t.day, t.year).c_str());
+			} else {
+				ImGui::Text("No date");
+			}
 
 			ImGui::EndTable();
 		}

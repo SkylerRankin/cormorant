@@ -3,9 +3,31 @@
 #include <deque>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
+
+struct ImageTimestamp {
+	unsigned short year;
+	unsigned char month;
+	unsigned char day;
+	unsigned char hour;
+	unsigned char minute;
+	unsigned char second;
+};
+
+struct ImageMetadata {
+	std::optional<std::string> cameraMake = std::nullopt;
+	std::optional<std::string> cameraModel = std::nullopt;
+	std::optional<unsigned short> bitsPerSample = std::nullopt;
+	std::optional<double> shutterSpeed = std::nullopt;
+	std::optional<double> aperture = std::nullopt;
+	std::optional<unsigned short> iso = std::nullopt;
+	std::optional<double> focalLength = std::nullopt;
+	std::optional<glm::vec2> resolution = std::nullopt;
+	std::optional<ImageTimestamp> timestamp = std::nullopt;
+};
 
 struct Image {
 	int id = -1;
@@ -13,6 +35,7 @@ struct Image {
 	std::string path;
 	glm::ivec2 size;
 	glm::ivec2 previewSize;
+	ImageMetadata metadata;
 	unsigned int filesize;
 	unsigned int timestamp;
 	unsigned int previewTextureId;
@@ -20,6 +43,7 @@ struct Image {
 	// Flags are true if the texture is available on GPU
 	bool previewLoaded = false;
 	bool imageLoaded = false;
+	// True if the image metadata is loaded
 	bool fileInfoLoaded = false;
 };
 
@@ -104,5 +128,10 @@ private:
 	full resolution. `previewData` will be set to a null pointer.
 	*/
 	bool loadImageFromFile(int id, unsigned char*& imageData, unsigned char*& previewData, bool skipFullResolution, bool skipPreview);
+	
+	/*
+	Parses strings in format YYYY:MM:DD HH:MM:SS into a struct.
+	*/
+	ImageTimestamp parseEXIFTimestamp(std::string text);
 
 };

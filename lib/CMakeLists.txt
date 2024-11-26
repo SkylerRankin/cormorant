@@ -106,3 +106,20 @@ FetchContent_Declare(
 message("Fetching glm")
 FetchContent_MakeAvailable(glm)
 target_compile_definitions(glm INTERFACE GLM_FORCE_SILENT_WARNINGS)
+
+# ------ TinyXML-2 --------------------------------------------------
+
+FetchContent_Declare(
+    tinyxml2
+    GIT_REPOSITORY https://github.com/leethomason/tinyxml2
+    GIT_TAG     10.0.0
+    GIT_SHALLOW    TRUE
+    GIT_PROGRESS   TRUE
+)
+
+message("Fetching tinyxml2")
+FetchContent_MakeAvailable(tinyxml2)
+
+# ------ TinyEXIF ---------------------------------------------------
+
+add_subdirectory(tinyEXIF)

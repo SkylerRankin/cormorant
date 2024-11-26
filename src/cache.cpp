@@ -1,12 +1,14 @@
 #include <filesystem>
 #include <iostream>
 #include <thread>
+#include <fstream>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image_resize2.h>
 #include "glCommon.h"
 #include "cache.h"
+#include <TinyEXIF.h>
 
 namespace fs = std::filesystem;
 
@@ -140,6 +142,36 @@ bool ImageCache::loadImageFromFile(int id, unsigned char*& imageData, unsigned c
 	imageData = stbi_load(image->path.c_str(), &width, &height, &channels, 3);
 	image->size = glm::ivec2(width, height);
 	image->previewSize = previewTextureSize;
+	
+	if (!image->fileInfoLoaded) {
+		std::ifstream stream(image->path, std::ios::binary);
+		if (!stream) {
+			std::cout << "Failed to open file stream for image " << image->path << std::endl;
+		} else {
+			TinyEXIF::EXIFInfo exif{ stream };
+			if (exif.Fields) {
+				image->metadata.cameraMake = exif.Make;
+				image->metadata.cameraModel = exif.Model;
+				image->metadata.aperture = exif.FNumber;
+				image->metadata.shutterSpeed = exif.ExposureTime;
+				image->metadata.iso = exif.ISOSpeedRatings;
+				image->metadata.focalLength = exif.FocalLength;
+				image->metadata.bitsPerSample = exif.BitsPerSample;
+				image->metadata.resolution = glm::vec2(exif.XResolution, exif.YResolution);
+
+				// Preference order for timestamps: original > digitized > last modified
+				if (!exif.DateTimeOriginal.empty()) {
+					image->metadata.timestamp = parseEXIFTimestamp(exif.DateTimeOriginal);
+				} else if (!exif.DateTimeDigitized.empty()) {
+					image->metadata.timestamp = parseEXIFTimestamp(exif.DateTimeDigitized);
+				} else {
+					image->metadata.timestamp = parseEXIFTimestamp(exif.DateTime);
+				}
+			}
+		}
+		stream.close();
+	}
+
 	image->fileInfoLoaded = true;
 
 	if (imageData == nullptr) {
@@ -354,4 +386,33 @@ void ImageCache::evictOldestImage() {
 	}
 
 	delete originalHead;
+}
+
+ImageTimestamp ImageCache::parseEXIFTimestamp(std::string text) {
+	ImageTimestamp timestamp{};
+
+	int start = 0;
+	int end = text.find(':', start);
+	timestamp.year = std::stoi(text.substr(start, end));
+	start = end + 1;
+
+	end = text.find(':', start);
+	timestamp.month = std::stoi(text.substr(start, end));
+	start = end + 1;
+
+	end = text.find(' ', start);
+	timestamp.day = std::stoi(text.substr(start, end));
+	start = end + 1;
+
+	end = text.find(':', start);
+	timestamp.hour = std::stoi(text.substr(start, end));
+	start = end + 1;
+
+	end = text.find(':', start);
+	timestamp.minute = std::stoi(text.substr(start, end));
+	start = end + 1;
+
+	timestamp.second = std::stoi(text.substr(start));
+
+	return timestamp;
 }
