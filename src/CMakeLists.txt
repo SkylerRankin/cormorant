@@ -12,7 +12,7 @@ set(CXX_HEADERS
     include/group.h
     include/frame_buffer.h
     include/glCommon.h
-    include/image.h
+    include/imageView.h
     include/ui.h
 )
 set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
@@ -23,7 +23,7 @@ set(CXX_SRCS
     cache.cpp
     group.cpp
     frame_buffer.cpp
-    image.cpp
+    imageView.cpp
     main.cpp
     ui.cpp
 )

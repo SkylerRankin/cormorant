@@ -1,7 +1,7 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "image.h"
+#include "imageView.h"
 
 ImageRenderer::ImageRenderer() {
 	// Setup quad for single images

@@ -3,7 +3,7 @@
 #include <vector>
 #include "cache.h"
 #include "glCommon.h"
-#include "image.h"
+#include "imageView.h"
 #include "ui.h"
 #include "group.h"
 
