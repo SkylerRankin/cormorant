@@ -80,11 +80,13 @@ void ImageCache::threadInitCacheFromDirectory(std::string path, std::atomic_bool
 
 	// Add enough images for full processing to saturate cache, and then add the remaining images
 	// for just preview processing.
+	std::vector<int> fullTextureIds;
 	int id = 0;
 	while (id < cacheCapacity && id < images.size()) {
-		getImageWithCacheUpdate(id);
+		fullTextureIds.push_back(id);
 		id++;
 	}
+	useImagesFullTextures(fullTextureIds);
 
 	std::lock_guard<std::mutex> guard(imageQueueMutex);
 	while (id < images.size()) {
@@ -289,35 +291,62 @@ const Image* ImageCache::getImage(int id) {
 	return &images.at(id);
 }
 
-const Image* ImageCache::getImageWithCacheUpdate(int id) {
-	assert(images.contains(id) && std::format("Image cache has no entry for id {}", id).c_str());
+void ImageCache::useImageFullTexture(int id) {
+	std::vector<int> ids;
+	ids.push_back(id);
+	useImagesFullTextures(ids);
+}
 
-	const Image& image = images.at(id);
+void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
+	// No point in pushing more items to the queue than the cache has capacity, since
+	// this will just result in evicting stuff that was just added.
+	int maxIndex = ids.size() - 1;
+	if (ids.size() > cacheCapacity) {
+		maxIndex = cacheCapacity - 1;
+	}
 
-	if (!image.imageLoaded) {
-		// This image does not have a full resolution texture loaded. Add it
-		// to the image loading queue. Only one thread needs to be notified to
-		// process this entry.
+	{
+		bool pushedToQueue = false;
 		std::lock_guard<std::mutex> guard(imageQueueMutex);
-		ImageQueueEntry entry{ id, true, !image.previewLoaded };
-		imageQueue.push_back(entry);
-		imageQueueConditionVariable.notify_one();
-	}
+		int imagesLoaded = 0;
+		for (int i = 0; i <= maxIndex; i++) {
+			int id = ids.at(i);
+			const Image& image = images.at(id);
 
-	if (imageToLRUNode.contains(id)) {
-		// This image is already somewhere in the LRU list. Move it to the end, making it
-		// the new most recently used image.
-		useLRUNode(imageToLRUNode.at(id));
-	} else {
-		// This image is not in the LRU list. Add it to the end and evict the oldest image
-		// if necessary.
-		if (imageToLRUNode.size() == cacheCapacity) {
-			evictOldestImage();
+			if (!image.imageLoaded) {
+				// This image does not have a full resolution texture loaded. Add it
+				// to the image loading queue. Only one thread needs to be notified to
+				// process this entry.
+				ImageQueueEntry entry{ id, true, !image.previewLoaded };
+				imageQueue.push_back(entry);
+				pushedToQueue = true;
+			}
+
+			if (imagesLoaded++ >= cacheCapacity) {
+				break;
+			}
 		}
-		addLRUNode(id);
+
+		if (pushedToQueue) {
+			imageQueueConditionVariable.notify_all();
+		}
 	}
 
-	return &image;
+	for (int i = 0; i <= maxIndex; i++) {
+		int id = ids.at(i);
+		if (imageToLRUNode.contains(id)) {
+			// This image is already somewhere in the LRU list. Move it to the end, making it
+			// the new most recently used image.
+			useLRUNode(imageToLRUNode.at(id));
+		} else {
+			// This image is not in the LRU list. Add it to the end and evict the oldest image
+			// if necessary.
+			if (imageToLRUNode.size() == cacheCapacity) {
+				evictOldestImage();
+			}
+			addLRUNode(id);
+		}
+	}
 }
 
 void ImageCache::addLRUNode(int id) {
@@ -413,6 +442,16 @@ ImageTimestamp ImageCache::parseEXIFTimestamp(std::string text) {
 	start = end + 1;
 
 	timestamp.second = std::stoi(text.substr(start));
+
+	tm timeComponents{};
+	timeComponents.tm_year = timestamp.year - 1900;
+	timeComponents.tm_mon = timestamp.month - 1;
+	timeComponents.tm_mday = timestamp.day;
+	timeComponents.tm_hour = timestamp.hour;
+	timeComponents.tm_min = timestamp.minute;
+	timeComponents.tm_sec = timestamp.second;
+	timeComponents.tm_isdst = -1;
+	timestamp.secondsSinceEpoch = mktime(&timeComponents);
 
 	return timestamp;
 }

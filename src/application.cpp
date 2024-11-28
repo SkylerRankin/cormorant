@@ -2,9 +2,9 @@
 #include "application.h"
 
 Application::Application(GLFWwindow* window) : window(window) {
-    imageRenderer = new ImageRenderer();
     cache = new ImageCache();
-    ui = new UI(window, imageRenderer->getTextureId(), groups, cache);
+    imageRenderer = new ImageRenderer(cache->getImages());
+    ui = new UI(window, imageRenderer->getTextureId(), groups, cache, groupParameters);
 
     directoryLoaded.store(false);
 
@@ -14,8 +14,18 @@ Application::Application(GLFWwindow* window) : window(window) {
         cache->initCacheFromDirectory(path, directoryLoaded);
     });
 
-    ui->setImageSelectedCallback([this](int i) -> void {
-        imageRenderer->setImage(cache->getImageWithCacheUpdate(i));
+    ui->setGroupSelectedCallback([this](int group) -> void {
+        // Preload images in the selected group
+        cache->useImagesFullTextures(groups.at(group));
+    });
+
+    ui->setImageSelectedCallback([this](int id) -> void {
+        cache->useImageFullTexture(id);
+        imageRenderer->setImage(id);
+    });
+
+    ui->setRegenerateGroupsCallback([this]() -> void {
+        generateGroups(groups, groupParameters, cache->getImages());
     });
 }
 

@@ -15,20 +15,23 @@ enum ControlPanelState {
 
 class UI {
 public:
-    UI(GLFWwindow* window, GLuint imageTexture, const std::vector<Group>& groups, ImageCache* imageCache);
+    UI(GLFWwindow* window, GLuint imageTexture, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
     ~UI();
     void renderFrame();
     glm::ivec2 getImageTargetSize() const;
     glm::ivec2 getImageTargetPosition() const;
 
     void setDirectoryOpenedCallback(std::function<void(std::string)> callback);
+    void setGroupSelectedCallback(std::function<void(int)> callback);
     void setImageSelectedCallback(std::function<void(int)> callback);
+    void setRegenerateGroupsCallback(std::function<void()> callback);
 
 private:
     const glm::ivec2 previewImageSize{75, 75};
 
     GLuint imageTexture;
-    const std::vector<Group>& groups;
+    const std::vector<std::vector<int>>& groups;
+    GroupParameters& groupParameters;
     ImageCache* imageCache;
     glm::ivec2 imageTargetSize;
     glm::ivec2 imageTargetPosition;
@@ -44,5 +47,7 @@ private:
 
     // Callbacks
     std::function<void(std::string)> onDirectoryOpened;
+    std::function<void(int)> onGroupSelected;
     std::function<void(int)> onImageSelected;
+    std::function<void()> onRegenerateGroups;
 };

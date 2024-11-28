@@ -14,15 +14,16 @@ struct RectObject {
 
 class ImageRenderer {
 public:
-	ImageRenderer();
+	ImageRenderer(const std::map<int, Image>&);
 	void renderFrame();
 	void updateTargetSize(glm::ivec2 newSize);
 	void zoom(int amount);
 	void pan(glm::ivec2 offset);
-	void setImage(const Image* image);
+	void setImage(int id);
 	GLint getTextureId();
 
 private:
+	const std::map<int, Image>& images;
 	glm::ivec2 imageTargetSize{ 1, 1 };
 	glm::ivec2 imageSize;
 	FrameBuffer frameBuffer;
@@ -33,7 +34,7 @@ private:
 
 	GLuint shaderProgram;
 	GLuint imageTextureUnit = 1;
-	const Image* image = nullptr;
+	int imageID = -1;
 	RectObject singleImageRect;
 
 	void buildShaders();

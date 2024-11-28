@@ -3,7 +3,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "imageView.h"
 
-ImageRenderer::ImageRenderer() {
+ImageRenderer::ImageRenderer(const std::map<int, Image>& images) : images(images) {
 	// Setup quad for single images
 	float singleQuad[] = {
 		// First triangle
@@ -76,8 +76,8 @@ void ImageRenderer::pan(glm::ivec2 offset) {
 	updatePanZoomTransform();
 }
 
-void ImageRenderer::setImage(const Image* image) {
-	this->image = image;
+void ImageRenderer::setImage(int id) {
+	imageID = id;
 	currentZoom = 1.0f;
 	panOffset = glm::ivec2(0.0f, 0.0f);
 	updatePanZoomTransform();
@@ -171,12 +171,14 @@ void ImageRenderer::buildShaders() {
 
 void ImageRenderer::renderSingleImage() {
 	// TODO: when image is not available, maybe render some other loading image instead of nothing?
-	if (image == nullptr || !image->imageLoaded) {
+	if (imageID == -1 || !images.at(imageID).imageLoaded) {
 		return;
 	}
 
+	const Image& image = images.at(imageID);
+
 	glActiveTexture(GL_TEXTURE0 + imageTextureUnit);
-	glBindTexture(GL_TEXTURE_2D, image->fullTextureId);
+	glBindTexture(GL_TEXTURE_2D, image.fullTextureId);
 
 	glBindVertexArray(singleImageRect.vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -184,12 +186,17 @@ void ImageRenderer::renderSingleImage() {
 }
 
 void ImageRenderer::updateBaseImageTransform() {
-	if (image == nullptr) {
+	if (imageID == -1) {
+		return;
+	}
+
+	const Image& image = images.at(imageID);
+	if (!image.fileInfoLoaded) {
 		return;
 	}
 
 	float windowAspectRatio = (float) imageTargetSize.x / imageTargetSize.y;
-	float imageAspectRatio = (float) image->size.x / image->size.y;
+	float imageAspectRatio = (float) image.size.x / image.size.y;
 
 	glm::mat4 transform = glm::mat4(1.0f);
 	if (windowAspectRatio > imageAspectRatio) {

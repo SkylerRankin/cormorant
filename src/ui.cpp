@@ -1,14 +1,14 @@
 #include <iostream>
 #include <format>
-#include "ui.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <tinyfiledialogs.h>
+#include "ui.h"
 
-UI::UI(GLFWwindow* window, GLuint imageTexture, const std::vector<Group>& groups, ImageCache* imageCache)
-	: imageTexture(imageTexture), imageTargetSize(glm::ivec2(0, 0)), groups(groups), imageCache(imageCache) {
+UI::UI(GLFWwindow* window, GLuint imageTexture, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
+	: imageTexture(imageTexture), imageTargetSize(glm::ivec2(0, 0)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -80,7 +80,7 @@ void UI::renderFrame() {
 
 		// Split into two dock nodes, the main viewporrt and the left panel
 		ImGuiID dockRightID = dockspaceID;
-		ImGuiID dockLeftID = ImGui::DockBuilderSplitNode(dockRightID, ImGuiDir_Left, 0.20f, nullptr, &dockRightID);
+		ImGuiID dockLeftID = ImGui::DockBuilderSplitNode(dockRightID, ImGuiDir_Left, 0.25f, nullptr, &dockRightID);
 
 		// Remove the tab bar / title from each window
 		ImGui::DockBuilderGetNode(dockRightID)->LocalFlags |= ImGuiDockNodeFlags_NoTabBar;
@@ -146,20 +146,35 @@ void UI::renderControlPanelGroups() {
 		// Row 0
 		ImGui::TableNextRow();
 		ImGui::TableSetColumnIndex(0);
-		static bool timeCheck = false;
-		ImGui::Checkbox("Time", &timeCheck);
+		ImGui::Checkbox("Time", &groupParameters.timeEnabled);
+
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(90, 90, 90, 255));
+		ImGui::Text("?");
+		ImGui::PopStyleColor();
+		ImGui::SetItemTooltip("Maximum seconds between images within the same group.");
 		ImGui::Spacing();
 
 		ImGui::TableSetColumnIndex(1);
 		ImGui::SetNextItemWidth(-1);
-		static int timeScale = 10;
-		ImGui::SliderInt("##time", &timeScale, 0, 100, "%d sec", 0);
+		if (!groupParameters.timeEnabled) {
+			ImGui::BeginDisabled();
+		}
+		ImGui::SliderInt("##time", &groupParameters.timeSeconds, 0, 60, "%d sec", 0);
+		if (!groupParameters.timeEnabled) {
+			ImGui::EndDisabled();
+		}
+		if (groupParameters.timeSeconds < 0) {
+			groupParameters.timeSeconds = 0;
+		} else if (groupParameters.timeSeconds > 60) {
+			groupParameters.timeSeconds = 60;
+		}
 
 		// Row 1
 		ImGui::TableNextRow();
 		ImGui::TableSetColumnIndex(0);
 		static bool shutterCheck = false;
-		ImGui::Checkbox("Shutter speed", &shutterCheck);
+		ImGui::Checkbox("Shutter", &shutterCheck);
 		ImGui::Spacing();
 
 		ImGui::TableSetColumnIndex(1);
@@ -169,13 +184,17 @@ void UI::renderControlPanelGroups() {
 
 		ImGui::EndTable();
 
-		ImGui::Separator();
+		ImGui::Spacing();
 
-		ImGui::Button("Regenerate Groups");
-
-		ImGui::Separator();
+		float tableWidth = ImGui::GetContentRegionAvail().x;
+		if (ImGui::Button("Regenerate Groups")) {
+			onRegenerateGroups();
+		}
+		ImGui::Spacing();
 	}
 
+	ImGui::Spacing();
+	ImGui::Separator();
 	ImGui::Spacing();
 
 	if (groups.size() == 1) {
@@ -183,6 +202,7 @@ void UI::renderControlPanelGroups() {
 	} else {
 		ImGui::Text("%d Groups", groups.size());
 	}
+
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(168, 143, 50, 255));
 	ImGui::TextWrapped("? groups with 0 selections");
 	ImGui::PopStyleColor();
@@ -193,26 +213,24 @@ void UI::renderControlPanelGroups() {
 	bool anyChildHovered = false;
 
 	for (int i = 0; i < groups.size(); i++) {
-		const Group& group = groups[i];
 		if (hoveredChildIndex == i) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
 		}
 
 		ImGui::BeginChild(std::format("group_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+		if (ImGui::BeginTable(std::format("group_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody)) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
 
-		ImGui::BeginTable(std::format("group_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody);
-		ImGui::TableNextRow();
-		ImGui::TableSetColumnIndex(0);
+			unsigned int textureId = imageCache->getImage(groups[i][0])->previewTextureId;
+			ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
 
-		unsigned int textureId = imageCache->getImage(group.startIndex)->previewTextureId;
-		ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
-
-		ImGui::TableSetColumnIndex(1);
-		ImGui::Text("Group %d", i);
-		ImGui::Separator();
-		ImGui::Text("%d images", group.endIndex - group.startIndex + 1);
-		ImGui::EndTable();
-
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("Group %d", i);
+			ImGui::Separator();
+			ImGui::Text("%d images", groups[i].size());
+			ImGui::EndTable();
+		}
 		ImGui::EndChild();
 
 		if (hoveredChildIndex == i) {
@@ -230,7 +248,11 @@ void UI::renderControlPanelGroups() {
 
 		if (ImGui::IsItemClicked()) {
 			selectedGroup = i;
+			onGroupSelected(selectedGroup);
 			controlPanelState = ControlPanel_ShowFiles;
+			// Auto select the first image in the group
+			selectedImage = groups[selectedGroup][0];
+			onImageSelected(selectedImage);
 		}
 	}
 
@@ -255,7 +277,7 @@ void UI::renderControlPanelFiles() {
 	static int hoveredChildIndex = -1;
 	bool anyChildHovered = false;
 
-	for (int i = groups[selectedGroup].startIndex; i <= groups[selectedGroup].endIndex; i++) {
+	for (int i : groups[selectedGroup]) {
 		if (i == selectedImage) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 255));
 		} else if (i == hoveredChildIndex) {
@@ -286,7 +308,7 @@ void UI::renderControlPanelFiles() {
 				ImageTimestamp t = image->metadata.timestamp.value();
 				ImGui::Text(std::format("{}:{:0>2} {}/{}/{}", t.hour, t.minute, t.month, t.day, t.year).c_str());
 			} else {
-				ImGui::Text("No date");
+				ImGui::Text("Date unknown");
 			}
 
 			ImGui::EndTable();
@@ -340,6 +362,14 @@ void UI::setDirectoryOpenedCallback(std::function<void(std::string)> callback) {
 	onDirectoryOpened = callback;
 }
 
+void UI::setGroupSelectedCallback(std::function<void(int)> callback) {
+	onGroupSelected = callback;
+}
+
 void UI::setImageSelectedCallback(std::function<void(int)> callback) {
 	onImageSelected = callback;
+}
+
+void UI::setRegenerateGroupsCallback(std::function<void()> callback) {
+	onRegenerateGroups = callback;
 }

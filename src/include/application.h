@@ -32,7 +32,8 @@ private:
 	ImageRenderer* imageRenderer;
 	UI* ui;
 	ImageCache* cache;
-	std::vector<Group> groups;
+	std::vector<std::vector<int>> groups;
+	GroupParameters groupParameters;
 
 	// Input state
 	bool leftClickDown = false;

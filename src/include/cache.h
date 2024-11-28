@@ -15,6 +15,7 @@ struct ImageTimestamp {
 	unsigned char hour;
 	unsigned char minute;
 	unsigned char second;
+	long long secondsSinceEpoch;
 };
 
 struct ImageMetadata {
@@ -71,10 +72,16 @@ public:
 	~ImageCache();
 
 	void frameUpdate();
-	// Returns an image, but this image is not used in the context of the LRU cache.
+	// Returns an image, but this image is not updated in the context of the LRU cache.
 	const Image* getImage(int id);
-	// Returns an image and updates the LRU cache entry for the image.
-	const Image* getImageWithCacheUpdate(int id);
+
+	/*
+	For each provided id, move that image to front of LRU list and add it to the image queue
+	to load the full resolution texture, if its not already loaded.
+	*/
+	void useImageFullTexture(int id);
+	void useImagesFullTextures(std::vector<int>& ids);
+
 	/*
 	Initializes the cache to have an entry for every valid image file in the given directory. Full resolution
 	image data is loaded for each image up until the cache is full, at which point only preview images are
@@ -85,7 +92,7 @@ public:
 
 private:
 	// Max full resolution images to keep stored in GPU at a time
-	const int cacheCapacity = 10;
+	const int cacheCapacity = 20;
 	const int defaultImageLoadThreads = 1;
 	const int textureQueueEntriesPerFrame = 1;
 	const glm::ivec2 previewTextureSize{75, 75};
