@@ -287,7 +287,7 @@ void ImageCache::processTextureQueue() {
 	}
 }
 
-const Image* ImageCache::getImage(int id) {
+Image* ImageCache::getImage(int id) {
 	return &images.at(id);
 }
 
@@ -311,6 +311,10 @@ void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
 		int imagesLoaded = 0;
 		for (int i = 0; i <= maxIndex; i++) {
 			int id = ids.at(i);
+			if (!images.contains(id)) {
+				continue;
+			}
+
 			const Image& image = images.at(id);
 
 			if (!image.imageLoaded) {

@@ -18,6 +18,8 @@ public:
     UI(GLFWwindow* window, GLuint imageTexture, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
     ~UI();
     void renderFrame();
+    int getCurrentGroupIndex() const;
+    int getCurrentImageID() const;
     glm::ivec2 getImageTargetSize() const;
     glm::ivec2 getImageTargetPosition() const;
 
@@ -25,6 +27,12 @@ public:
     void setGroupSelectedCallback(std::function<void(int)> callback);
     void setImageSelectedCallback(std::function<void(int)> callback);
     void setRegenerateGroupsCallback(std::function<void()> callback);
+
+    void nextImage();
+    void previousImage();
+    // Called when the skipped flag on an image is changed. This is required because if the selected image is
+    // now skipped, the UI should automatically move to the next unskipped image.
+    void skippedImage();
 
 private:
     const glm::ivec2 previewImageSize{75, 75};
@@ -40,6 +48,7 @@ private:
     ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
     int selectedGroup;
     int selectedImage = -1;
+    bool hideSkippedImages = true;
 
     void renderControlPanelGroups();
     void renderControlPanelFiles();

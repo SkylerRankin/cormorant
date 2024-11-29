@@ -19,6 +19,7 @@ UI::UI(GLFWwindow* window, GLuint imageTexture, const std::vector<std::vector<in
 
 	// Disable ImGui saving the layout modifications to a .ini file
 	io.IniFilename = nullptr;
+	io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
 }
 
 UI::~UI() {
@@ -267,6 +268,8 @@ void UI::renderControlPanelFiles() {
 		selectedImage = -1;
 	}
 
+	ImGui::Checkbox("Hide skipped images", &hideSkippedImages);
+
 	ImGui::Spacing();
 	ImGui::Separator();
 	ImGui::Spacing();
@@ -278,6 +281,10 @@ void UI::renderControlPanelFiles() {
 	bool anyChildHovered = false;
 
 	for (int i : groups[selectedGroup]) {
+		const Image* image = imageCache->getImage(i);
+
+		if (image->skipped && hideSkippedImages) continue;
+
 		if (i == selectedImage) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 255));
 		} else if (i == hoveredChildIndex) {
@@ -289,13 +296,24 @@ void UI::renderControlPanelFiles() {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 
-			const Image* image = imageCache->getImage(i);
 			// TODO: choose texture id based on image status. completed image is the preview texture,
 			//	loading image is some loading texture, failed is some error texture
 			ImGui::Image(image->previewTextureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
 
 			ImGui::TableSetColumnIndex(1);
+
+			if (image->saved) {
+				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(69, 173, 73, 255));
+			} else if (image->skipped) {
+				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(60, 60, 60, 255));
+			}
+
 			ImGui::Text(image->filename.c_str());
+
+			if (image->saved) {
+				ImGui::PopStyleColor();
+			}
+
 			ImGui::Separator();
 			ImGui::Text(bytesToSizeString(image->filesize).c_str());
 			if (image->fileInfoLoaded) {
@@ -309,6 +327,10 @@ void UI::renderControlPanelFiles() {
 				ImGui::Text(std::format("{}:{:0>2} {}/{}/{}", t.hour, t.minute, t.month, t.day, t.year).c_str());
 			} else {
 				ImGui::Text("Date unknown");
+			}
+
+			if (image->skipped) {
+				ImGui::PopStyleColor();
 			}
 
 			ImGui::EndTable();
@@ -350,12 +372,106 @@ std::string UI::bytesToSizeString(int bytes) {
 	}
 }
 
+int UI::getCurrentGroupIndex() const {
+	return selectedGroup;
+}
+
+int UI::getCurrentImageID() const {
+	return selectedImage;
+}
+
 glm::ivec2 UI::getImageTargetSize() const {
 	return imageTargetSize;
 }
 
 glm::ivec2 UI::getImageTargetPosition() const {
 	return imageTargetPosition;
+}
+
+void UI::nextImage() {
+	int index = -1;
+	for (int i = 0; i < groups[selectedGroup].size() - 1; i++) {
+		if (selectedImage == groups[selectedGroup][i]) {
+			index = i;
+			break;
+		}
+	}
+
+	if (index == -1) {
+		return;
+	}
+
+	// Find next un-skipped image
+	for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
+		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
+			selectedImage = i;
+			onImageSelected(selectedImage);
+			break;
+		}
+	}
+}
+
+void UI::previousImage() {
+	int index = -1;
+	for (int i = 1; i < groups[selectedGroup].size(); i++) {
+		if (selectedImage == groups[selectedGroup][i]) {
+			index = i;
+			break;
+		}
+	}
+
+	if (index == -1) {
+		return;
+	}
+
+	// Find previous un-skipped image
+	for (int i = index - 1; i >= 0; i--) {
+		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
+			selectedImage = i;
+			onImageSelected(selectedImage);
+			break;
+		}
+	}
+}
+
+void UI::skippedImage() {
+	// Selected image is not skipped, so UI doesn't require update
+	if (!imageCache->getImage(selectedImage)->skipped) {
+		return;
+	}
+
+	int index = -1;
+	for (int i = 0; i < groups[selectedGroup].size(); i++) {
+		if (selectedImage == groups[selectedGroup][i]) {
+			index = i;
+			break;
+		}
+	}
+
+	// Invalid selected group
+	assert(index != -1 && std::format("UI::skippedImage invalid selectedImage = {}", selectedImage).c_str());
+
+	// Search forward for a non-skipped image
+	for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
+		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
+			selectedImage = i;
+			onImageSelected(selectedImage);
+			return;
+		}
+	}
+
+	// Search backward for a non-skipped image
+	for (int i = index - 1; i >= 0; i--) {
+		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
+			selectedImage = i;
+			onImageSelected(selectedImage);
+			return;
+		}
+	}
+
+	// No available images
+	selectedImage = -1;
+	onImageSelected(selectedImage);
 }
 
 void UI::setDirectoryOpenedCallback(std::function<void(std::string)> callback) {

@@ -46,6 +46,10 @@ struct Image {
 	bool imageLoaded = false;
 	// True if the image metadata is loaded
 	bool fileInfoLoaded = false;
+	// True if image was marked as skipped in UI
+	bool skipped = false;
+	// True if image was marked as saved in UI
+	bool saved = false;
 };
 
 struct ImageQueueEntry {
@@ -73,7 +77,7 @@ public:
 
 	void frameUpdate();
 	// Returns an image, but this image is not updated in the context of the LRU cache.
-	const Image* getImage(int id);
+	Image* getImage(int id);
 
 	/*
 	For each provided id, move that image to front of LRU list and add it to the image queue

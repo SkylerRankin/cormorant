@@ -68,7 +68,26 @@ void Application::frameUpdate() {
     }
 }
 
-void Application::onKeyPress(int key, int scancode, int action, int mods) {}
+void Application::onKeyPress(int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_UP || key == GLFW_KEY_LEFT || key == GLFW_KEY_W) {
+            ui->previousImage();
+        } else if (key == GLFW_KEY_DOWN || key == GLFW_KEY_RIGHT || key == GLFW_KEY_S) {
+            ui->nextImage();
+        } else if (key == GLFW_KEY_DELETE || key == GLFW_KEY_BACKSPACE) {
+            // Toggle marking image as skipped
+            Image* image = cache->getImage(ui->getCurrentImageID());
+            image->skipped = !image->skipped;
+            image->saved = false;
+            ui->skippedImage();
+        } else if (key == GLFW_KEY_ENTER) {
+            // Toggle marking image as saved
+            Image* image = cache->getImage(ui->getCurrentImageID());
+            image->saved = !image->saved;
+            image->skipped = false;
+        }
+    }
+}
 
 void Application::onClick(int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
