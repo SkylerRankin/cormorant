@@ -62,14 +62,40 @@ void ImageRenderer::updateTargetSize(glm::ivec2 newSize) {
 	updateBaseImageTransform();
 }
 
-void ImageRenderer::zoom(int amount) {
+/*
+Zooming is relative to the mouse position. This means the pixel under the mouse should not be
+translated with zooming. When the mouse is not over a pixel in the image, the zoom is relative
+to the center of the image.
+*/
+void ImageRenderer::zoom(int amount, glm::ivec2 position) {
+	float previousZoom = currentZoom;
 	currentZoom += zoomSpeed * amount;
 	if (currentZoom < 1.0f) {
 		currentZoom = 1.0f;
 	}
+
+	// Current center of image, in screen space coordinates
+	glm::vec2 screenSpaceCenter = glm::vec2(panOffset.x, -1.0f * panOffset.y);
+	// Position of cursor, in screen space coordinates
+	glm::vec2 screenSpacePosition = glm::vec2(position) / glm::vec2(imageTargetSize) * 2.0f - 1.0f;
+	glm::vec2 screenSpaceDiff = screenSpacePosition - screenSpaceCenter;
+
+	// The screen space offset from current pixel position to its position after scaling. Need to use
+	// the ratio of current zoom to previous here. The original point was already scaled by the previous
+	// zoom factor, so only the additional zoom should be used.
+	glm::vec2 offset = screenSpaceDiff * (currentZoom / previousZoom) - screenSpaceDiff;
+	offset.y *= -1;
+	panOffset -= offset;
 	updatePanZoomTransform();
 }
 
+/*
+Move the image within a 2D plane. Positive offset values move right and down. The
+vertical offset is negated so that the `panOffset` vec2 uses positives for upwards
+movement.
+
+`panOffset` stores the screen space offset from 0,0 to the current center of the image.
+*/
 void ImageRenderer::pan(glm::ivec2 offset) {
 	panOffset.x += offset.x / (float)imageTargetSize.x * 2.0f;
 	panOffset.y += -1 * offset.y / (float)imageTargetSize.y * 2.0f;
@@ -214,9 +240,11 @@ void ImageRenderer::updateBaseImageTransform() {
 
 void ImageRenderer::updatePanZoomTransform() {
 	glUseProgram(shaderProgram);
-	glm::mat4 transform = glm::mat4(1.0f);
-	transform = glm::translate(transform, glm::vec3(panOffset, 0.0f));
-	transform = glm::scale(transform, glm::vec3(currentZoom, currentZoom, 1.0f));
+	glm::mat4 identity = glm::mat4(1.0f);
+	glm::mat4 scale = glm::scale(identity, glm::vec3(currentZoom, currentZoom, 1.0f));
+	glm::mat4 translate = glm::translate(identity, glm::vec3(panOffset, 0.0f));
+	glm::mat4 transform = translate * scale;
+
 	GLuint transformLocation = glGetUniformLocation(shaderProgram, "transform");
 	glUniformMatrix4fv(transformLocation, 1, GL_FALSE, glm::value_ptr(transform));
 }

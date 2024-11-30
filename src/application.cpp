@@ -124,7 +124,7 @@ void Application::onWindowResized(int width, int height) {
 
 void Application::onScroll(int offset) {
     if (mouseOverlappingImage()) {
-        imageRenderer->zoom(offset);
+        imageRenderer->zoom(offset, prevMousePosition - ui->getImageTargetPosition());
     }
 }
 

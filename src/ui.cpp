@@ -114,6 +114,7 @@ void UI::renderFrame() {
 
 	ImGui::End();
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::Begin("right_panel", nullptr);
 
 	imageTargetSize.x = (int) ImGui::GetContentRegionAvail().x;
@@ -123,6 +124,7 @@ void UI::renderFrame() {
 
 	ImGui::Image(imageTexture, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 	ImGui::End();
+	ImGui::PopStyleVar();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
