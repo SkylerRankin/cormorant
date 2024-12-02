@@ -29,15 +29,18 @@ public:
 
 private:
 	GLFWwindow* window;
-	ImageRenderer* imageRenderer;
+	ImageViewer* imageViewer[2];
 	UI* ui;
 	ImageCache* cache;
 	std::vector<std::vector<int>> groups;
 	GroupParameters groupParameters;
+	ViewMode viewMode = ViewMode_Single;
+	bool imageViewMovementLocked = true;
 
 	// Input state
 	bool leftClickDown = false;
 	bool panningImage = false;
+	int mouseActiveImage = -1;
 	glm::ivec2 prevMousePosition;
 	glm::ivec2 leftClickStart;
 
@@ -45,6 +48,8 @@ private:
 	ProcessingState processingState = ProcessingState_None;
 	std::atomic_bool directoryLoaded;
 
-	bool mouseOverlappingImage();
+	bool mouseOverlappingImage(int imageView = 0);
+	void toggleSkipImage(int id);
+	void toggleSaveImage(int id);
 
 };

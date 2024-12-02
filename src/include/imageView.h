@@ -12,15 +12,16 @@ struct RectObject {
 	GLuint vbo;
 };
 
-class ImageRenderer {
+class ImageViewer {
 public:
-	ImageRenderer(const std::map<int, Image>&);
+	ImageViewer(const std::map<int, Image>&);
 	void renderFrame();
 	void updateTargetSize(glm::ivec2 newSize);
 	void zoom(int amount, glm::ivec2 position);
 	void pan(glm::ivec2 offset);
 	void setImage(int id);
 	GLint getTextureId();
+	void resetTransform();
 
 private:
 	const std::map<int, Image>& images;

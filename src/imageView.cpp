@@ -3,7 +3,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "imageView.h"
 
-ImageRenderer::ImageRenderer(const std::map<int, Image>& images) : images(images) {
+ImageViewer::ImageViewer(const std::map<int, Image>& images) : images(images) {
 	// Setup quad for single images
 	float singleQuad[] = {
 		// First triangle
@@ -39,7 +39,7 @@ ImageRenderer::ImageRenderer(const std::map<int, Image>& images) : images(images
 	buildShaders();
 }
 
-void ImageRenderer::renderFrame() {
+void ImageViewer::renderFrame() {
 	frameBuffer.bind();
 
 	glViewport(0, 0, imageTargetSize.x, imageTargetSize.y);
@@ -52,7 +52,7 @@ void ImageRenderer::renderFrame() {
 	frameBuffer.unbind();
 }
 
-void ImageRenderer::updateTargetSize(glm::ivec2 newSize) {
+void ImageViewer::updateTargetSize(glm::ivec2 newSize) {
 	if (newSize == imageTargetSize) {
 		return;
 	}
@@ -67,7 +67,7 @@ Zooming is relative to the mouse position. This means the pixel under the mouse 
 translated with zooming. When the mouse is not over a pixel in the image, the zoom is relative
 to the center of the image.
 */
-void ImageRenderer::zoom(int amount, glm::ivec2 position) {
+void ImageViewer::zoom(int amount, glm::ivec2 position) {
 	float previousZoom = currentZoom;
 	currentZoom += zoomSpeed * amount;
 	if (currentZoom < 1.0f) {
@@ -96,25 +96,22 @@ movement.
 
 `panOffset` stores the screen space offset from 0,0 to the current center of the image.
 */
-void ImageRenderer::pan(glm::ivec2 offset) {
+void ImageViewer::pan(glm::ivec2 offset) {
 	panOffset.x += offset.x / (float)imageTargetSize.x * 2.0f;
 	panOffset.y += -1 * offset.y / (float)imageTargetSize.y * 2.0f;
 	updatePanZoomTransform();
 }
 
-void ImageRenderer::setImage(int id) {
+void ImageViewer::setImage(int id) {
 	imageID = id;
-	currentZoom = 1.0f;
-	panOffset = glm::ivec2(0.0f, 0.0f);
-	updatePanZoomTransform();
 	updateBaseImageTransform();
 }
 
-GLint ImageRenderer::getTextureId() {
+GLint ImageViewer::getTextureId() {
 	return frameBuffer.getTextureId();
 }
 
-void ImageRenderer::buildShaders() {
+void ImageViewer::buildShaders() {
 	const char* vertexShaderSource = R"(
 		#version 330 core
 		layout (location = 0) in vec3 position;
@@ -195,7 +192,7 @@ void ImageRenderer::buildShaders() {
 	glDeleteShader(fragmentShader);
 }
 
-void ImageRenderer::renderSingleImage() {
+void ImageViewer::renderSingleImage() {
 	// TODO: when image is not available, maybe render some other loading image instead of nothing?
 	if (imageID == -1 || !images.at(imageID).imageLoaded) {
 		return;
@@ -211,7 +208,7 @@ void ImageRenderer::renderSingleImage() {
 	glActiveTexture(GL_TEXTURE0);
 }
 
-void ImageRenderer::updateBaseImageTransform() {
+void ImageViewer::updateBaseImageTransform() {
 	if (imageID == -1) {
 		return;
 	}
@@ -238,7 +235,7 @@ void ImageRenderer::updateBaseImageTransform() {
 	glUniformMatrix4fv(transformLocation, 1, GL_FALSE, glm::value_ptr(transform));
 }
 
-void ImageRenderer::updatePanZoomTransform() {
+void ImageViewer::updatePanZoomTransform() {
 	glUseProgram(shaderProgram);
 	glm::mat4 identity = glm::mat4(1.0f);
 	glm::mat4 scale = glm::scale(identity, glm::vec3(currentZoom, currentZoom, 1.0f));
@@ -247,4 +244,10 @@ void ImageRenderer::updatePanZoomTransform() {
 
 	GLuint transformLocation = glGetUniformLocation(shaderProgram, "transform");
 	glUniformMatrix4fv(transformLocation, 1, GL_FALSE, glm::value_ptr(transform));
+}
+
+void ImageViewer::resetTransform() {
+	currentZoom = 1.0f;
+	panOffset = glm::vec2(0, 0);
+	updatePanZoomTransform();
 }

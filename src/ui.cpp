@@ -1,5 +1,6 @@
 #include <iostream>
 #include <format>
+#include <set>
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
@@ -7,9 +8,9 @@
 #include <tinyfiledialogs.h>
 #include "ui.h"
 
-UI::UI(GLFWwindow* window, GLuint imageTexture, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
-	: imageTexture(imageTexture), imageTargetSize(glm::ivec2(0, 0)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
-    IMGUI_CHECKVERSION();
+UI::UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
+	: imageViewTextures(textureIDs), imageTargetSize(glm::ivec2(0, 0)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
+	IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -114,17 +115,13 @@ void UI::renderFrame() {
 
 	ImGui::End();
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin("right_panel", nullptr);
-
-	imageTargetSize.x = (int) ImGui::GetContentRegionAvail().x;
-	imageTargetSize.y = (int) ImGui::GetContentRegionAvail().y;
-	imageTargetPosition.x = (int) ImGui::GetWindowPos().x;
-	imageTargetPosition.y = (int)ImGui::GetWindowPos().y;
-
-	ImGui::Image(imageTexture, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
-	ImGui::End();
-	ImGui::PopStyleVar();
+	if (viewMode == ViewMode_Single) {
+		renderSingleImageView();
+	} else if (viewMode == ViewMode_ManualCompare) {
+		renderCompareImageView();
+	} else if (viewMode == ViewMode_AutoCompare) {
+		renderCompareImageView();
+	}
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -136,6 +133,14 @@ void UI::renderFrame() {
 			controlPanelState = ControlPanel_ShowGroups;
 			onDirectoryOpened(result);
 		}
+	}
+
+	if (updateViewMode) {
+		viewMode = static_cast<ViewMode>(newViewMode);
+		selectedImages.fill(-1);
+		onViewModeUpdated(newViewMode);
+		updateViewMode = false;
+		newViewMode = -1;
 	}
 }
 
@@ -253,9 +258,9 @@ void UI::renderControlPanelGroups() {
 			selectedGroup = i;
 			onGroupSelected(selectedGroup);
 			controlPanelState = ControlPanel_ShowFiles;
-			// Auto select the first image in the group
-			selectedImage = groups[selectedGroup][0];
-			onImageSelected(selectedImage);
+			selectedImages.fill(-1);
+			onImageSelected(0, -1);
+			onImageSelected(1, -1);
 		}
 	}
 
@@ -267,10 +272,46 @@ void UI::renderControlPanelGroups() {
 void UI::renderControlPanelFiles() {
 	if (ImGui::Button("Return to groups")) {
 		controlPanelState = ControlPanel_ShowGroups;
-		selectedImage = -1;
+		selectedImages.fill(-1);
 	}
 
+	const char* viewingModes[] = {"Single Image", "Manual Compare", "Auto Compare"};
+
+	if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int) viewMode], 0)) {
+		for (int i = 0; i < 3; i++) {
+			const bool selected = i == static_cast<int>(viewMode);
+			if (ImGui::Selectable(viewingModes[i], selected)) {
+				updateViewMode = true;
+				newViewMode = i;
+			}
+
+			if (selected) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(90, 90, 90, 255));
+	ImGui::Text("?");
+	ImGui::PopStyleColor();
+	ImGui::SetItemTooltip("info about viewing modes");
+
 	ImGui::Checkbox("Hide skipped images", &hideSkippedImages);
+
+	if (viewMode == ViewMode_Single) {
+		ImGui::BeginDisabled();
+	}
+
+	static bool movementLocked = true;
+	if (ImGui::Checkbox("Lock movement", &movementLocked)) {
+		onMovementLock(movementLocked);
+	}
+
+	if (viewMode == ViewMode_Single) {
+		ImGui::EndDisabled();
+	}
 
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -287,14 +328,14 @@ void UI::renderControlPanelFiles() {
 
 		if (image->skipped && hideSkippedImages) continue;
 
-		if (i == selectedImage) {
+		if (i == selectedImages[0] || i == selectedImages[1]) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 255));
 		} else if (i == hoveredChildIndex) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
 		}
 
 		ImGui::BeginChild(std::format("file_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
-		if (ImGui::BeginTable(std::format("file_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody)) {
+		if (ImGui::BeginTable(std::format("file_table_{}", i).c_str(), 3, ImGuiTableFlags_NoBordersInBody)) {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 
@@ -310,7 +351,13 @@ void UI::renderControlPanelFiles() {
 				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(60, 60, 60, 255));
 			}
 
-			ImGui::Text(image->filename.c_str());
+			if (viewMode == ViewMode_ManualCompare && selectedImages[0] == i) {
+				ImGui::Text(std::format("{} - Left", image->filename).c_str());
+			} else if (viewMode == ViewMode_ManualCompare && selectedImages[1] == i) {
+				ImGui::Text(std::format("{} - Right", image->filename).c_str());
+			} else {
+				ImGui::Text(image->filename.c_str());
+			}
 
 			if (image->saved) {
 				ImGui::PopStyleColor();
@@ -334,34 +381,166 @@ void UI::renderControlPanelFiles() {
 			if (image->skipped) {
 				ImGui::PopStyleColor();
 			}
+			
+			if (i == hoveredChildIndex && viewMode == ViewMode_ManualCompare) {
+				ImGui::TableSetColumnIndex(2);
+				if (ImGui::Button("Left", ImVec2(50, 20))) {
+					selectedImages[0] = i;
+					onImageSelected(0, selectedImages[0]);
+				}
+
+				if (ImGui::Button("Right", ImVec2(50, 20))) {
+					selectedImages[1] = i;
+					onImageSelected(1, selectedImages[1]);
+				}
+			}
 
 			ImGui::EndTable();
 		}
 
 		ImGui::EndChild();
 
-		if (i == hoveredChildIndex || i == selectedImage) {
+		if (i == hoveredChildIndex || i == selectedImages[0] || i == selectedImages[1]) {
 			ImGui::PopStyleColor();
 		}
 
-		if (ImGui::IsItemHovered()) {
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly)) {
 			ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-		}
-
-		if (ImGui::IsItemHovered()) {
 			hoveredChildIndex = i;
 			anyChildHovered = true;
 		}
 
-		if (ImGui::IsItemClicked()) {
-			selectedImage = i;
-			onImageSelected(i);
+		if (ImGui::IsItemClicked() && viewMode == ViewMode_Single) {
+			selectedImages[0] = i;
+			onImageSelected(0, selectedImages[0]);
 		}
 	}
 
 	if (!anyChildHovered) {
 		hoveredChildIndex = -1;
 	}
+}
+
+void UI::renderSingleImageView() {
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::Begin("right_panel", nullptr);
+
+	imageTargetSize.x = (int)ImGui::GetContentRegionAvail().x;
+	imageTargetSize.y = (int)ImGui::GetContentRegionAvail().y;
+	imageTargetPositions[0].x = (int)ImGui::GetWindowPos().x;
+	imageTargetPositions[0].y = (int)ImGui::GetWindowPos().y;
+
+	ImGui::Image(imageViewTextures[0], ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
+
+	bool showControls =
+		controlPanelState == ControlPanel_ShowFiles &&
+		selectedImages[0] != -1;
+
+	if (showControls) {
+		// Renders the image view overlay
+		const float topMargin = 10;
+		glm::vec2 position{
+			imageTargetPositions[0].x + (imageTargetSize.x / 2),
+			imageTargetPositions[0].y + topMargin
+		};
+
+		renderImageViewOverlay(selectedImages[0], position);
+	}
+
+	ImGui::End();
+	ImGui::PopStyleVar();
+}
+
+void UI::renderCompareImageView() {
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::Begin("right_panel", nullptr);
+
+	imageTargetSize.x = (int)ImGui::GetContentRegionAvail().x / 2.0f;
+	imageTargetSize.y = (int)ImGui::GetContentRegionAvail().y;
+	imageTargetPositions[0].x = (int)ImGui::GetWindowPos().x;
+	imageTargetPositions[0].y = (int)ImGui::GetWindowPos().y;
+	imageTargetPositions[1].x = (int)ImGui::GetWindowPos().x + imageTargetSize.x;
+	imageTargetPositions[1].y = (int)ImGui::GetWindowPos().y;
+
+	ImVec2 halfSize = ImVec2(ImGui::GetContentRegionAvail().x / 2.0f, ImGui::GetContentRegionAvail().y);
+
+	ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, 0);
+	ImGui::Image(imageViewTextures[0], halfSize, ImVec2(0, 1), ImVec2(1, 0));
+	ImGui::SameLine();
+	ImGui::Image(imageViewTextures[1], halfSize, ImVec2(0, 1), ImVec2(1, 0));
+	ImGui::PopStyleVar();
+
+	// Render the overlay only for the image view overlapping the cursor
+	ImVec2 mousePosition = ImGui::GetMousePos();
+	bool leftImageHovered =
+		mousePosition.x >= imageTargetPositions[0].x && mousePosition.x <= imageTargetPositions[0].x + imageTargetSize.x &&
+		mousePosition.y >= imageTargetPositions[0].y && mousePosition.y <= imageTargetPositions[0].y + imageTargetSize.y;
+	bool rightImageHovered =
+		mousePosition.x >= imageTargetPositions[1].x && mousePosition.x <= imageTargetPositions[1].x + imageTargetSize.x &&
+		mousePosition.y >= imageTargetPositions[1].y && mousePosition.y <= imageTargetPositions[1].y + imageTargetSize.y;
+
+	if (controlPanelState == ControlPanel_ShowFiles && selectedImages[0] != -1 && leftImageHovered) {
+		const float topMargin = 10;
+		glm::vec2 position{
+			imageTargetPositions[0].x + (imageTargetSize.x / 2),
+			imageTargetPositions[0].y + topMargin
+		};
+		renderImageViewOverlay(selectedImages[0], position);
+	} else if (controlPanelState == ControlPanel_ShowFiles && selectedImages[1] != -1 && rightImageHovered) {
+		const float topMargin = 10;
+		glm::vec2 position{
+			imageTargetPositions[1].x + (imageTargetSize.x / 2),
+			imageTargetPositions[1].y + topMargin
+		};
+		renderImageViewOverlay(selectedImages[1], position);
+	}
+
+	ImGui::End();
+	ImGui::PopStyleVar();
+}
+
+void UI::renderImageViewOverlay(int id, glm::vec2 position) {
+	const ImVec2 buttonSize(75, 20);
+	const int buttonSpacing = 10;
+	const int buttonCount = 3;
+
+	ImVec2 controlSize{ buttonCount * buttonSize.x + (buttonCount - 1) * buttonSpacing, buttonSize.y };
+	position.x -= controlSize.x / 2.0f;
+
+	ImGui::SetNextItemAllowOverlap();
+	ImGui::SetNextWindowPos(ImVec2(position.x, position.y));
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(0, 0, 0, 0));
+	ImGui::BeginChild("right_controls", controlSize);
+
+	ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, buttonSpacing);
+
+	const Image* image = imageCache->getImage(id);
+	bool imageSaved = image->saved;
+	bool imageSkipped = image->skipped;
+
+	if (imageSaved) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(69, 173, 73, 255));
+	if (ImGui::Button("Saved", buttonSize)) {
+		onSaveImage(id);
+	}
+	if (imageSaved) ImGui::PopStyleColor();
+
+	ImGui::SameLine();
+
+	if (imageSkipped) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(69, 173, 73, 255));
+	if (ImGui::Button("Skipped", buttonSize)) {
+		onSkipImage(id);
+	}
+	if (imageSkipped) ImGui::PopStyleColor();
+
+	ImGui::SameLine();
+	if (ImGui::Button("Reset", buttonSize)) {
+		onResetImageTransform(id);
+	}
+
+	ImGui::PopStyleVar();
+
+	ImGui::PopStyleColor();
+	ImGui::EndChild();
 }
 
 std::string UI::bytesToSizeString(int bytes) {
@@ -378,116 +557,111 @@ int UI::getCurrentGroupIndex() const {
 	return selectedGroup;
 }
 
-int UI::getCurrentImageID() const {
-	return selectedImage;
-}
-
 glm::ivec2 UI::getImageTargetSize() const {
 	return imageTargetSize;
 }
 
-glm::ivec2 UI::getImageTargetPosition() const {
-	return imageTargetPosition;
+glm::ivec2 UI::getImageTargetPosition(int imageView) const {
+	return imageTargetPositions[imageView];
 }
 
-void UI::nextImage() {
-	int index = -1;
-	for (int i = 0; i < groups[selectedGroup].size() - 1; i++) {
-		if (selectedImage == groups[selectedGroup][i]) {
-			index = i;
-			break;
+void UI::goToNextUnskippedImage() {
+	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
+		if (imageView > 0 && viewMode == ViewMode_Single) break;
+
+		// Find index of selected image within the group
+		int index = -1;
+		for (int i = 0; i < groups[selectedGroup].size(); i++) {
+			if (selectedImages[imageView] == groups[selectedGroup][i]) {
+				index = i;
+				break;
+			}
 		}
-	}
 
-	if (index == -1) {
-		return;
-	}
+		if (index == -1) return;
 
-	// Find next un-skipped image
-	for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
-		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
-			selectedImage = i;
-			onImageSelected(selectedImage);
-			break;
+		// Find the next image that is not skipped
+		for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
+			int newImage = groups[selectedGroup][i];
+			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
+			if (!imageCache->getImage(newImage)->skipped) {
+				selectedImages[imageView] = newImage;
+				onImageSelected(imageView, newImage);
+				break;
+			}
 		}
 	}
 }
 
-void UI::previousImage() {
-	int index = -1;
-	for (int i = 1; i < groups[selectedGroup].size(); i++) {
-		if (selectedImage == groups[selectedGroup][i]) {
-			index = i;
-			break;
+void UI::goToPreviousUnskippedImage() {
+	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
+		if (imageView > 0 && viewMode == ViewMode_Single) break;
+
+		// Find index of selected image within the group
+		int index = -1;
+		for (int i = 0; i < groups[selectedGroup].size(); i++) {
+			if (selectedImages[imageView] == groups[selectedGroup][i]) {
+				index = i;
+				break;
+			}
 		}
-	}
 
-	if (index == -1) {
-		return;
-	}
+		if (index == -1) return;
 
-	// Find previous un-skipped image
-	for (int i = index - 1; i >= 0; i--) {
-		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
-			selectedImage = i;
-			onImageSelected(selectedImage);
-			break;
+		// Find the previous image that is not skipped
+		for (int i = index - 1; i >= 0; i--) {
+			int newImage = groups[selectedGroup][i];
+			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
+			if (!imageCache->getImage(newImage)->skipped) {
+				selectedImages[imageView] = newImage;
+				onImageSelected(imageView, newImage);
+				break;
+			}
 		}
 	}
 }
 
 void UI::skippedImage() {
-	// Selected image is not skipped, so UI doesn't require update
-	if (!imageCache->getImage(selectedImage)->skipped) {
-		return;
-	}
+	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
+		if (imageView > 0 && viewMode == ViewMode_Single) break;
 
-	int index = -1;
-	for (int i = 0; i < groups[selectedGroup].size(); i++) {
-		if (selectedImage == groups[selectedGroup][i]) {
-			index = i;
-			break;
+		// The image for this view isn't skipped, so no update required
+		if (!imageCache->getImage(selectedImages[imageView])->skipped) continue;
+
+		// Find index of selected image within the group
+		int index = -1;
+		for (int i = 0; i < groups[selectedGroup].size(); i++) {
+			if (selectedImages[imageView] == groups[selectedGroup][i]) {
+				index = i;
+				break;
+			}
 		}
-	}
 
-	// Invalid selected group
-	assert(index != -1 && std::format("UI::skippedImage invalid selectedImage = {}", selectedImage).c_str());
+		if (index == -1) continue;
 
-	// Search forward for a non-skipped image
-	for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
-		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
-			selectedImage = i;
-			onImageSelected(selectedImage);
-			return;
+		// Search forward for a non-skipped image
+		for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
+			int newImage = groups[selectedGroup][i];
+			if (!imageCache->getImage(newImage)->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
+				selectedImages[imageView] = newImage;
+				onImageSelected(imageView, newImage);
+				return;
+			}
 		}
-	}
 
-	// Search backward for a non-skipped image
-	for (int i = index - 1; i >= 0; i--) {
-		if (!imageCache->getImage(groups[selectedGroup][i])->skipped) {
-			selectedImage = i;
-			onImageSelected(selectedImage);
-			return;
+		// Search backward for a non-skipped image
+		for (int i = index - 1; i >= 0; i--) {
+			int newImage = groups[selectedGroup][i];
+			if (!imageCache->getImage(groups[selectedGroup][i])->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
+				selectedImages[imageView] = newImage;
+				onImageSelected(imageView, newImage);
+				return;
+			}
 		}
+
+		// No available images
+		int newImage = -1;
+		selectedImages[imageView] = newImage;
+		onImageSelected(imageView, newImage);
 	}
-
-	// No available images
-	selectedImage = -1;
-	onImageSelected(selectedImage);
-}
-
-void UI::setDirectoryOpenedCallback(std::function<void(std::string)> callback) {
-	onDirectoryOpened = callback;
-}
-
-void UI::setGroupSelectedCallback(std::function<void(int)> callback) {
-	onGroupSelected = callback;
-}
-
-void UI::setImageSelectedCallback(std::function<void(int)> callback) {
-	onImageSelected = callback;
-}
-
-void UI::setRegenerateGroupsCallback(std::function<void()> callback) {
-	onRegenerateGroups = callback;
 }
