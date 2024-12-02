@@ -323,6 +323,8 @@ void UI::renderControlPanelFiles() {
 	static int hoveredChildIndex = -1;
 	bool anyChildHovered = false;
 
+	ImGui::BeginChild("files_scroll_window", ImVec2(-1, -1), 0, 0);
+
 	for (int i : groups[selectedGroup]) {
 		const Image* image = imageCache->getImage(i);
 
@@ -419,6 +421,8 @@ void UI::renderControlPanelFiles() {
 	if (!anyChildHovered) {
 		hoveredChildIndex = -1;
 	}
+
+	ImGui::EndChild();
 }
 
 void UI::renderSingleImageView() {
