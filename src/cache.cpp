@@ -292,6 +292,8 @@ Image* ImageCache::getImage(int id) {
 }
 
 void ImageCache::useImageFullTexture(int id) {
+	if (id == -1) return;
+
 	std::vector<int> ids;
 	ids.push_back(id);
 	useImagesFullTextures(ids);
@@ -319,15 +321,10 @@ void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
 
 			if (!image.imageLoaded) {
 				// This image does not have a full resolution texture loaded. Add it
-				// to the image loading queue. Only one thread needs to be notified to
-				// process this entry.
+				// to the image loading queue.
 				ImageQueueEntry entry{ id, true, !image.previewLoaded };
 				imageQueue.push_back(entry);
 				pushedToQueue = true;
-			}
-
-			if (imagesLoaded++ >= cacheCapacity) {
-				break;
 			}
 		}
 
