@@ -444,7 +444,7 @@ void UI::renderSingleImageView() {
 			imageTargetPositions[0].y + topMargin
 		};
 
-		renderImageViewOverlay(selectedImages[0], position);
+		renderImageViewOverlay(0, position);
 	}
 
 	ImGui::End();
@@ -485,21 +485,21 @@ void UI::renderCompareImageView() {
 			imageTargetPositions[0].x + (imageTargetSize.x / 2),
 			imageTargetPositions[0].y + topMargin
 		};
-		renderImageViewOverlay(selectedImages[0], position);
+		renderImageViewOverlay(0, position);
 	} else if (controlPanelState == ControlPanel_ShowFiles && selectedImages[1] != -1 && rightImageHovered) {
 		const float topMargin = 10;
 		glm::vec2 position{
 			imageTargetPositions[1].x + (imageTargetSize.x / 2),
 			imageTargetPositions[1].y + topMargin
 		};
-		renderImageViewOverlay(selectedImages[1], position);
+		renderImageViewOverlay(1, position);
 	}
 
 	ImGui::End();
 	ImGui::PopStyleVar();
 }
 
-void UI::renderImageViewOverlay(int id, glm::vec2 position) {
+void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 	const ImVec2 buttonSize(75, 20);
 	const int buttonSpacing = 10;
 	const int buttonCount = 3;
@@ -514,6 +514,7 @@ void UI::renderImageViewOverlay(int id, glm::vec2 position) {
 
 	ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, buttonSpacing);
 
+	int id = selectedImages[imageView];
 	const Image* image = imageCache->getImage(id);
 	bool imageSaved = image->saved;
 	bool imageSkipped = image->skipped;
@@ -534,7 +535,7 @@ void UI::renderImageViewOverlay(int id, glm::vec2 position) {
 
 	ImGui::SameLine();
 	if (ImGui::Button("Reset", buttonSize)) {
-		onResetImageTransform(id);
+		onResetImageTransform(imageView);
 	}
 
 	ImGui::PopStyleVar();

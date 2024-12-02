@@ -75,6 +75,6 @@ private:
     void renderControlPanelFiles();
     void renderSingleImageView();
     void renderCompareImageView();
-    void renderImageViewOverlay(int id, glm::vec2 position);
+    void renderImageViewOverlay(int imageView, glm::vec2 position);
     std::string bytesToSizeString(int bytes);
 };
