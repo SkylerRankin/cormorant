@@ -48,6 +48,12 @@ private:
 	ProcessingState processingState = ProcessingState_None;
 	std::atomic_bool directoryLoaded;
 
+	// Image pre-loading
+	// When an image is selected using onImageSelected, the next n and
+	// previous m images are also loaded.
+	int preloadNextImageCount = 2;
+	int preloadPreviousImageCount = 1;
+
 	bool mouseOverlappingImage(int imageView = 0);
 	void toggleSkipImage(int id);
 	void toggleSaveImage(int id);

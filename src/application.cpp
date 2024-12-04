@@ -22,7 +22,42 @@ Application::Application(GLFWwindow* window) : window(window) {
     };
 
     ui->onImageSelected = [this](int imageView, int id) -> void {
-        cache->useImageFullTexture(id);
+        int indexInGroup = -1;
+        std::vector<int>& group = groups.at(ui->getCurrentGroupIndex());
+        for (int i = 0; i < group.size(); i++) {
+            if (group[i] == id) {
+                indexInGroup = i;
+                break;
+            }
+        }
+
+        if (indexInGroup == -1) {
+            cache->useImageFullTexture(id);
+        } else {
+            // Also load a few images ahead and behind when loading the selected image.
+            const auto& images = cache->getImages();
+            std::vector<int> imageIDs;
+            imageIDs.push_back(id);
+
+            for (int i = 1; i <= preloadNextImageCount; i++) {
+                if (indexInGroup + i >= group.size()) break;
+                int imageID = group.at(indexInGroup + i);
+                if (!images.at(imageID).imageLoaded) {
+                    imageIDs.push_back(imageID);
+                }
+            }
+
+            for (int i = 1; i <= preloadPreviousImageCount; i++) {
+                if (indexInGroup - i < 0) break;
+                int imageID = group.at(indexInGroup - i);
+                if (!images.at(imageID).imageLoaded) {
+                    imageIDs.push_back(imageID);
+                }
+            }
+
+            cache->useImagesFullTextures(imageIDs);
+        }
+
         imageViewer[imageView]->setImage(id);
         if (viewMode == ViewMode_Single) {
             imageViewer[imageView]->resetTransform();
