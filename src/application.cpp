@@ -102,6 +102,7 @@ void Application::frameUpdate() {
         if (directoryLoaded.load()) {
             directoryLoaded.store(false);
             processingState = ProcessingState_None;
+            cache->startInitialTextureLoads();
             generateInitialGroup(groups, cache->getImages());
         }
         break;

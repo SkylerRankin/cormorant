@@ -367,11 +367,7 @@ void UI::renderControlPanelFiles() {
 
 			ImGui::Separator();
 			ImGui::Text(bytesToSizeString(image->filesize).c_str());
-			if (image->fileInfoLoaded) {
-				ImGui::Text("%d x %d", image->size.x, image->size.y);
-			} else {
-				ImGui::Text("Size unknown");
-			}
+			ImGui::Text("%d x %d", image->size.x, image->size.y);
 
 			if (image->metadata.timestamp.has_value()) {
 				ImageTimestamp t = image->metadata.timestamp.value();

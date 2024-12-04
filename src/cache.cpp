@@ -31,6 +31,18 @@ ImageCache::ImageCache() {
 		imageLoadThreads = hardwareThreads;
 	}
 
+	// Create the PBOs usable for texture uploads
+	 //TODO: is this an appropriate number of PBOs given the number of threads?
+	int pboCount = imageLoadThreads;
+	for (int i = 0; i < pboCount; i++) {
+		PBOQueueEntry entry{
+			.pbo = 0,
+			.mappedBuffer = nullptr
+		};
+		glGenBuffers(1, &entry.pbo);
+		availablePBOQueue.push_back(entry);
+	}
+
 	runImageLoadThreads.store(true);
 	startImageLoadingThreads();
 }
@@ -41,6 +53,8 @@ ImageCache::~ImageCache() {
 }
 
 void ImageCache::frameUpdate() {
+	processPendingPBOQueue();
+	processPendingImageQueue();
 	processTextureQueue();
 }
 
@@ -60,6 +74,29 @@ const std::map<int, Image>& ImageCache::getImages() const {
 	return images;
 }
 
+void ImageCache::startInitialTextureLoads() {
+	// Add all images for preview texture processing
+	for (auto const& e : images) {
+		ImageQueueEntry entry{
+			.imageID = e.first,
+			.pbo = 0,
+			.pboMapping = nullptr,
+			.isPreview = true
+		};
+		pendingImageQueue.push_back(entry);
+	}
+
+	// Add enough images for full texture processing to fill cache. The first
+	// n images are arbitrarily chosen.
+	std::vector<int> fullTextureIds;
+	int id = 0;
+	while (id < cacheCapacity && id < images.size()) {
+		fullTextureIds.push_back(id);
+		id++;
+	}
+	useImagesFullTextures(fullTextureIds);
+}
+
 void ImageCache::threadInitCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded) {
 	// TODO: clear all previous stored images from memory
 	images.clear();
@@ -73,77 +110,82 @@ void ImageCache::threadInitCacheFromDirectory(std::string path, std::atomic_bool
 			image.path = entryPathString;
 			image.filename = entryPath.filename().string();
 			image.filesize = fs::file_size(entryPath);
+			image.previewSize = previewTextureSize;
+
+			int width, height, components;
+			if (stbi_info(image.path.c_str(), &width, &height, &components)) {
+				image.size = glm::ivec2(width, height);
+			} else {
+				// TODO: mark this image with some error flag, cannot be rendered later
+				image.size = glm::ivec2(0, 0);
+				std::cout << "Failed to get info from stbi_info for file " << image.path << std::endl;
+			}
+
 			images.emplace(image.id, image);
 		}
 	}
 	directoryLoaded.store(true);
-
-	// Add enough images for full processing to saturate cache, and then add the remaining images
-	// for just preview processing.
-	std::vector<int> fullTextureIds;
-	int id = 0;
-	while (id < cacheCapacity && id < images.size()) {
-		fullTextureIds.push_back(id);
-		id++;
-	}
-	useImagesFullTextures(fullTextureIds);
-
-	std::lock_guard<std::mutex> guard(imageQueueMutex);
-	while (id < images.size()) {
-		ImageQueueEntry entry{ id, false, true };
-		imageQueue.push_back(entry);
-		id++;
-	}
-
-	imageQueueConditionVariable.notify_all();
 }
 
-void ImageCache::runImageLoadThread(int id) {
+void ImageCache::runImageLoadThread(int threadID) {
 	while (runImageLoadThreads.load()) {
-		// Wait for condition variable signal
+		// Wait for condition variable signal, signaled when main threads adds entries to queue
 		std::unique_lock<std::mutex> lock(imageQueueMutex);
 		imageQueueConditionVariable.wait(lock);
 		lock.unlock();
 
-		// Pull items from image queue as long as there are more entries
 		while (true) {
-			ImageQueueEntry entry;
+			ImageQueueEntry imageEntry;
 			{
-				std::lock_guard<std::mutex> guard(imageQueueMutex);
+				std::lock_guard<std::mutex> imageQueueGuard(imageQueueMutex);
 				if (imageQueue.size() == 0) {
-					// No more entries in image queue, break and go back to waiting on condition
+					// No more entries in image queue, break and go back to waiting on condition.
 					break;
 				} else {
-					entry = imageQueue.front();
+					imageEntry = imageQueue.front();
 					imageQueue.pop_front();
 				}
 			}
 
+			const Image* image = &images.at(imageEntry.imageID);
 			unsigned char* imageData;
-			unsigned char* previewData;
+			if (loadImageFromFile(imageEntry.imageID, imageEntry.isPreview, imageData)) {
+				// Copy the image data from memory into the PBO mapped memory location
+				unsigned int imageDataSize = imageEntry.isPreview ?
+					image->previewSize.x * image->previewSize.y * 3 :
+					image->size.x * image->size.y * 3;
+				// TODO: for full resolution images, load directly into the PBO memory to avoid this second copy
+				memcpy(imageEntry.pboMapping, imageData, imageDataSize);
+				if (imageEntry.isPreview) {
+					delete[] imageData;
+				} else {
+					stbi_image_free(imageData);
+				}
 
-			if (loadImageFromFile(entry.imageID, imageData, previewData, !entry.loadFullTexture, !entry.loadPreviewTexture)) {
-				TextureQueueEntry textureQueueEntry{ entry.imageID, imageData, previewData };
+				// Push a texture queue entry back to the main thread for uploading
+				TextureQueueEntry textureQueueEntry{
+					.imageID = imageEntry.imageID,
+					.pbo = imageEntry.pbo,
+					.isPreview = imageEntry.isPreview
+				};
 				{
 					std::lock_guard<std::mutex> guard(textureQueueMutex);
 					textureQueue.push_back(textureQueueEntry);
 				}
 			} else {
 				// TODO: is this thread safe?
-				images.at(entry.imageID).imageLoaded = false;
-				images.at(entry.imageID).previewLoaded = false;
+				images.at(imageEntry.imageID).imageLoaded = false;
+				images.at(imageEntry.imageID).previewLoaded = false;
 			}
 		}
 	}
 }
 
-bool ImageCache::loadImageFromFile(int id, unsigned char*& imageData, unsigned char*& previewData, bool skipFullResolution, bool skipPreview) {
+bool ImageCache::loadImageFromFile(int id, bool loadPreview, unsigned char*& imageData) {
 	Image* image = &images.at(id);
 	stbi_set_flip_vertically_on_load(true);
 	int width = 0, height = 0, channels = 0;
 	imageData = stbi_load(image->path.c_str(), &width, &height, &channels, 3);
-	image->size = glm::ivec2(width, height);
-	image->previewSize = previewTextureSize;
 	
 	if (!image->fileInfoLoaded) {
 		std::ifstream stream(image->path, std::ios::binary);
@@ -173,7 +215,6 @@ bool ImageCache::loadImageFromFile(int id, unsigned char*& imageData, unsigned c
 		}
 		stream.close();
 	}
-
 	image->fileInfoLoaded = true;
 
 	if (imageData == nullptr) {
@@ -186,20 +227,20 @@ bool ImageCache::loadImageFromFile(int id, unsigned char*& imageData, unsigned c
 		return false;
 	}
 
-	// Determine the preview image size that matches the original image aspect ratio, but maximally fits
-	// within the preview image size, which may have a different aspect ratio.
-	const float aspectRatio = width / (float)height;
-	const float previewAspectRatio = previewTextureSize.x / (float)previewTextureSize.y;
-	glm::ivec2 resizeSize = previewTextureSize;
-	if (aspectRatio > previewAspectRatio) {
-		resizeSize.y *= (previewAspectRatio / aspectRatio);
-	} else if (aspectRatio < previewAspectRatio) {
-		resizeSize.x *= (aspectRatio / previewAspectRatio);
-	}
+	if (loadPreview) {
+		// Determine the preview image size that matches the original image aspect ratio, but maximally fits
+		// within the preview image size, which may have a different aspect ratio.
+		const float aspectRatio = width / (float)height;
+		const float previewAspectRatio = previewTextureSize.x / (float)previewTextureSize.y;
+		glm::ivec2 resizeSize = previewTextureSize;
+		if (aspectRatio > previewAspectRatio) {
+			resizeSize.y *= (previewAspectRatio / aspectRatio);
+		} else if (aspectRatio < previewAspectRatio) {
+			resizeSize.x *= (aspectRatio / previewAspectRatio);
+		}
 
-	if (skipPreview) {
-		previewData = nullptr;
-	} else {
+		unsigned char* previewData;
+
 		// Resize original image into preview image size.
 		const int resizedImageBytes = resizeSize.x * resizeSize.y * channels;
 		unsigned char* resizedImageData = new unsigned char[resizedImageBytes];
@@ -230,59 +271,110 @@ bool ImageCache::loadImageFromFile(int id, unsigned char*& imageData, unsigned c
 			}
 			delete[] resizedImageData;
 		}
-	}
 
-	if (skipFullResolution) {
 		stbi_image_free(imageData);
-		imageData = nullptr;
+		imageData = previewData;
 	}
 
 	return true;
 }
 
+void ImageCache::processPendingImageQueue() {
+	int maxIterations = 5;
+	int iterations = 0;
+	bool pushedToQueue = false;
+	while (iterations++ < maxIterations) {
+		if (pendingImageQueue.size() == 0 || availablePBOQueue.size() == 0) break;
+
+		PBOQueueEntry pboEntry = availablePBOQueue.front();
+		availablePBOQueue.pop_front();
+
+		ImageQueueEntry imageEntry = pendingImageQueue.front();
+		pendingImageQueue.pop_front();
+		imageEntry.pbo = pboEntry.pbo;
+
+		const Image& image = images.at(imageEntry.imageID);
+		const unsigned int pboBytes = imageEntry.isPreview ?
+			previewTextureSize.x * previewTextureSize.y * 3 :
+			image.size.x * image.size.y * 3;
+
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, imageEntry.pbo);
+		glBufferData(GL_PIXEL_UNPACK_BUFFER, pboBytes, 0, GL_STATIC_DRAW);
+		imageEntry.pboMapping = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+
+		{
+			std::lock_guard<std::mutex> guard(imageQueueMutex);
+			imageQueue.push_back(imageEntry);
+			pushedToQueue = true;
+		}
+	}
+
+	if (pushedToQueue) {
+		imageQueueConditionVariable.notify_all();
+	}
+}
+
 void ImageCache::processTextureQueue() {
-	for (int i = 0; i < textureQueue.size() && i < textureQueueEntriesPerFrame; i++) {
+	int iterations = 0;
+	while (iterations++ < textureQueueEntriesPerFrame) {
 		TextureQueueEntry entry;
 		{
 			std::lock_guard<std::mutex> guard(textureQueueMutex);
+			if (textureQueue.size() == 0) return;
 			entry = textureQueue.front();
 			textureQueue.pop_front();
 		}
 
 		Image& image = images.at(entry.imageID);
 
-		// Create texture for full resolution image
-		if (entry.imageData != nullptr) {
-			glGenTextures(1, &image.fullTextureId);
-			glBindTexture(GL_TEXTURE_2D, image.fullTextureId);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
+		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		GLuint* textureID = entry.isPreview ? &image.previewTextureId : &image.fullTextureId;
+		glm::ivec2& textureSize = entry.isPreview ? image.previewSize : image.size;
 
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.size.x, image.size.y, 0, GL_RGB, GL_UNSIGNED_BYTE, entry.imageData);
-			glBindTexture(GL_TEXTURE_2D, 0);
-			stbi_image_free(entry.imageData);
-			image.imageLoaded = true;
+		glGenTextures(1, textureID);
+		glBindTexture(GL_TEXTURE_2D, *textureID);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
+		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureSize.x, textureSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+		pboToFence.emplace(entry.pbo, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		if (entry.isPreview) image.previewLoaded = true;
+		else image.imageLoaded = true;
+
+		// Move PBO to the pending queue
+		{
+			PBOQueueEntry pboEntry{
+				.pbo = entry.pbo,
+				.mappedBuffer = nullptr
+			};
+			pendingPBOQueue.push_back(pboEntry);
 		}
+	}
+}
 
-		// Create texture for preview image
-		if (entry.previewData != nullptr) {
-			glGenTextures(1, &image.previewTextureId);
-			glBindTexture(GL_TEXTURE_2D, image.previewTextureId);
-
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.previewSize.x, image.previewSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, entry.previewData);
-			glBindTexture(GL_TEXTURE_2D, 0);
-			delete[] entry.previewData;
-			image.previewLoaded = true;
+void ImageCache::processPendingPBOQueue() {
+	// use sync and fences to move completed pbo transfers back to the available pool
+	for (auto i = pboToFence.cbegin(); i != pboToFence.cend();) {
+		if (glClientWaitSync(i->second, 0, 0)) {
+			// The sync fence is signaled, so PBO is available for reuse
+			PBOQueueEntry entry{
+				.pbo = i->first,
+				.mappedBuffer = nullptr
+			};
+			availablePBOQueue.push_back(entry);
+			pboToFence.erase(i++);
+		} else {
+			i++;
 		}
 	}
 }
@@ -307,30 +399,15 @@ void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
 		maxIndex = cacheCapacity - 1;
 	}
 
-	{
-		bool pushedToQueue = false;
-		std::lock_guard<std::mutex> guard(imageQueueMutex);
-		int imagesLoaded = 0;
-		for (int i = 0; i <= maxIndex; i++) {
-			int id = ids.at(i);
-			if (!images.contains(id)) {
-				continue;
-			}
+	for (int i = 0; i <= maxIndex; i++) {
+		ImageQueueEntry entry{
+			.imageID = ids.at(i),
+			.pbo = 0,
+			.pboMapping = nullptr,
+			.isPreview = false
+		};
 
-			const Image& image = images.at(id);
-
-			if (!image.imageLoaded) {
-				// This image does not have a full resolution texture loaded. Add it
-				// to the image loading queue.
-				ImageQueueEntry entry{ id, true, !image.previewLoaded };
-				imageQueue.push_back(entry);
-				pushedToQueue = true;
-			}
-		}
-
-		if (pushedToQueue) {
-			imageQueueConditionVariable.notify_all();
-		}
+		pendingImageQueue.push_back(entry);
 	}
 
 	for (int i = 0; i <= maxIndex; i++) {

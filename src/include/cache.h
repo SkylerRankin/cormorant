@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
+#include "glCommon.h"
 
 struct ImageTimestamp {
 	unsigned short year;
@@ -52,16 +53,28 @@ struct Image {
 	bool saved = false;
 };
 
+/*
+An item in the image loading queue. These entries are consumed by one of the image
+loading threads. The image represented by `imageID` is decoded from disk and copied
+into the memory address used by the PBO `pbo`.
+*/
 struct ImageQueueEntry {
 	int imageID;
-	bool loadFullTexture;
-	bool loadPreviewTexture;
+	unsigned int pbo;
+	void* pboMapping;
+	// True if the image should be loaded in the preview format instead of its full resolution and aspect ratio.
+	bool isPreview;
 };
 
 struct TextureQueueEntry {
 	int imageID;
-	unsigned char* imageData;
-	unsigned char* previewData;
+	unsigned int pbo;
+	bool isPreview;
+};
+
+struct PBOQueueEntry {
+	unsigned int pbo;
+	void* mappedBuffer;
 };
 
 struct LRUNode {
@@ -93,10 +106,16 @@ public:
 	*/
 	void initCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded);
 	const std::map<int, Image>& getImages() const;
+	/*
+	Called right after the image directory is traversed and all files and their sizes are known. Pushes entires to
+	load preview textures for every image, as well as entires to load full resolution textures for the first n
+	images, where n is the cache capacity.
+	*/
+	void startInitialTextureLoads();
 
 private:
 	// Max full resolution images to keep stored in GPU at a time
-	const int cacheCapacity = 20;
+	const int cacheCapacity = 10;
 	const int defaultImageLoadThreads = 1;
 	const int textureQueueEntriesPerFrame = 1;
 	const glm::ivec2 previewTextureSize{75, 75};
@@ -113,6 +132,18 @@ private:
 	std::mutex textureQueueMutex;
 	std::mutex imageQueueConditionVariableMutex;
 	std::condition_variable imageQueueConditionVariable;
+	std::map<unsigned int, GLsync> pboToFence;
+
+	// Pending image queue: queue containing requested images on the main thread.
+	// Entries are only popped from this queue once they can be paired with an available
+	// PBO, and moved into the imageQueue accessible by the image loading threads.
+	std::deque<ImageQueueEntry> pendingImageQueue;
+
+	// PBO queues
+	std::deque<PBOQueueEntry> availablePBOQueue;
+	std::deque<PBOQueueEntry> pendingPBOQueue;
+
+	// LRU linked-list components
 	LRUNode* lruHead = nullptr;
 	LRUNode* lruEnd = nullptr;
 	std::map<int, LRUNode*> imageToLRUNode;
@@ -123,9 +154,15 @@ private:
 	void evictOldestImage();
 
 	void startImageLoadingThreads();
+	/*
+	Pulls entries from the pending image queue, pairs them with an available PBO, and moves
+	the entry into the image queue.
+	*/
+	void processPendingImageQueue();
 	void processTextureQueue();
+	void processPendingPBOQueue();
 	void threadInitCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded);
-	void runImageLoadThread(int id);
+	void runImageLoadThread(int threadID);
 	/*
 	Loads an image file for the given image id. This file is then decoded and stored in a buffer,
 	which `imageData` is updated to point to. The image is also resized to the preview size, and stored in a buffer
@@ -138,7 +175,7 @@ private:
 	If the preview image does not need to be saved, pass `skipPreview` as true. This will only allocate space for the
 	full resolution. `previewData` will be set to a null pointer.
 	*/
-	bool loadImageFromFile(int id, unsigned char*& imageData, unsigned char*& previewData, bool skipFullResolution, bool skipPreview);
+	bool loadImageFromFile(int id, bool loadPreview, unsigned char*& imageData);
 	
 	/*
 	Parses strings in format YYYY:MM:DD HH:MM:SS into a struct.
