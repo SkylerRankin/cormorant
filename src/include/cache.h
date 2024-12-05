@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic>
 #include <deque>
+#include <set>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -113,6 +114,9 @@ public:
 	*/
 	void startInitialTextureLoads();
 
+	bool previewLoadingComplete();
+	float getPreviewLoadProgress();
+
 private:
 	// Max full resolution images to keep stored in GPU at a time
 	const int cacheCapacity = 10;
@@ -133,6 +137,11 @@ private:
 	std::mutex imageQueueConditionVariableMutex;
 	std::condition_variable imageQueueConditionVariable;
 	std::map<unsigned int, GLsync> pboToFence;
+	
+	// Contains ids of all images that have had their image data and preview texture loaded.
+	// Used to track progress of the initial loads before full resolution textures can be
+	// used normally.
+	std::set<int> previewsLoaded;
 
 	// Pending image queue: queue containing requested images on the main thread.
 	// Entries are only popped from this queue once they can be paired with an available

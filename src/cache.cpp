@@ -59,6 +59,7 @@ void ImageCache::frameUpdate() {
 }
 
 void ImageCache::initCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded) {
+	previewsLoaded.clear();
 	std::thread thread(&ImageCache::threadInitCacheFromDirectory, this, path, std::ref(directoryLoaded));
 	thread.detach();
 }
@@ -72,6 +73,14 @@ void ImageCache::startImageLoadingThreads() {
 
 const std::map<int, Image>& ImageCache::getImages() const {
 	return images;
+}
+
+bool ImageCache::previewLoadingComplete() {
+	return previewsLoaded.size() == images.size();
+}
+
+float ImageCache::getPreviewLoadProgress() {
+	return previewsLoaded.size() / (float)images.size();
 }
 
 void ImageCache::startInitialTextureLoads() {
@@ -348,8 +357,14 @@ void ImageCache::processTextureQueue() {
 		pboToFence.emplace(entry.pbo, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
 		glBindTexture(GL_TEXTURE_2D, 0);
 
-		if (entry.isPreview) image.previewLoaded = true;
-		else image.imageLoaded = true;
+		if (entry.isPreview) {
+			image.previewLoaded = true;
+			if (previewsLoaded.size() < images.size()) {
+				previewsLoaded.insert(image.id);
+			}
+		} else {
+			image.imageLoaded = true;
+		}
 
 		// Move PBO to the pending queue
 		{

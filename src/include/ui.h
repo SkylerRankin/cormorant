@@ -35,6 +35,9 @@ public:
     // Called when the skipped flag on an image is changed. This is required because if the selected image is
     // now skipped, the UI should automatically move to the next unskipped image.
     void skippedImage();
+    // Functions for handling the preview loading progress UI
+    void setShowPreviewProgress(bool enabled);
+    void setPreviewProgress(float progress);
 
     // Callbacks
     std::function<void(std::string)> onDirectoryOpened;
@@ -58,6 +61,8 @@ private:
     glm::ivec2 imageTargetSize;
     std::array<glm::ivec2, 2> imageTargetPositions;
     ViewMode viewMode = ViewMode_Single;
+    bool showPreviewProgress = false;
+    float previewProgress = 0.0f;
 
     ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
     int selectedGroup;
@@ -76,5 +81,6 @@ private:
     void renderSingleImageView();
     void renderCompareImageView();
     void renderImageViewOverlay(int imageView, glm::vec2 position);
+    void renderPreviewProgress();
     std::string bytesToSizeString(int bytes);
 };

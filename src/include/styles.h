@@ -26,9 +26,9 @@ void setGlobalStyles() {
 	style.Colors[ImGuiCol_MenuBarBg] = Colors::gray1;
 	style.Colors[ImGuiCol_Border] = Colors::gray2;
 	
-	style.Colors[ImGuiCol_Header] = Colors::gray2;
-	style.Colors[ImGuiCol_HeaderHovered] = Colors::gray2;
-	style.Colors[ImGuiCol_HeaderActive] = Colors::gray2;
+	style.Colors[ImGuiCol_Header] = Colors::gray3;
+	style.Colors[ImGuiCol_HeaderHovered] = Colors::gray4;
+	style.Colors[ImGuiCol_HeaderActive] = Colors::gray3;
 
 	style.Colors[ImGuiCol_Button] = Colors::gray3;
 	style.Colors[ImGuiCol_ButtonHovered] = Colors::gray4;

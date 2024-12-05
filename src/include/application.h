@@ -10,8 +10,7 @@
 enum ProcessingState {
 	ProcessingState_None = 0,
 	ProcessingState_LoadingDirectory = 1,
-	ProcessingState_LoadingImages = 2,
-	ProcessingState_GeneratingGroups = 3,
+	ProcessingState_LoadingPreviews = 2,
 };
 
 class Application {

@@ -148,7 +148,12 @@ void UI::renderFrame() {
 }
 
 void UI::renderControlPanelGroups() {
+	ImVec2 previousWindowPadding = ImGui::GetStyle().WindowPadding;
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::BeginChild("group_parameter_window", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
 	if (ImGui::CollapsingHeader("Group Parameters")) {
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, previousWindowPadding);
+
 		ImGui::BeginTable("parameters_table", 2);
 
 		ImGui::TableSetupColumn("parameter_checkboxes", ImGuiTableColumnFlags_WidthFixed);
@@ -202,11 +207,18 @@ void UI::renderControlPanelGroups() {
 			onRegenerateGroups();
 		}
 		ImGui::Spacing();
+		ImGui::PopStyleVar();
 	}
+	ImGui::EndChild();
+	ImGui::PopStyleVar();
 
 	ImGui::Spacing();
 	ImGui::Separator();
 	ImGui::Spacing();
+
+	if (showPreviewProgress) {
+		renderPreviewProgress();
+	}
 
 	if (groups.size() == 1) {
 		ImGui::Text("1 Group");
@@ -237,7 +249,7 @@ void UI::renderControlPanelGroups() {
 			ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
 
 			ImGui::TableSetColumnIndex(1);
-			ImGui::Text("Group %d", i);
+			ImGui::Text("Group %d", i + 1);
 			ImGui::Separator();
 			ImGui::Text("%d images", groups[i].size());
 			ImGui::EndTable();
@@ -273,54 +285,75 @@ void UI::renderControlPanelGroups() {
 }
 
 void UI::renderControlPanelFiles() {
-	if (ImGui::Button("Return to groups")) {
+	if (ImGui::Button("Return to groups", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 		controlPanelState = ControlPanel_ShowGroups;
 		selectedImages.fill(-1);
 	}
+	if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 
-	const char* viewingModes[] = {"Single Image", "Manual Compare", "Auto Compare"};
+	ImGui::Spacing();
 
-	if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int) viewMode], 0)) {
-		for (int i = 0; i < 3; i++) {
-			const bool selected = i == static_cast<int>(viewMode);
-			if (ImGui::Selectable(viewingModes[i], selected)) {
-				updateViewMode = true;
-				newViewMode = i;
+	// The "CollapsingHeader" widget extends its width in both directions by `window->WindowPadding.x * 0.5f`. I'd
+	// prefer the width to match other widgets, so placing the widget within a child window with 0 padding will remove
+	// this additional width.
+	ImVec2 previousWindowPadding = ImGui::GetStyle().WindowPadding;
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::BeginChild("file_options_window", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
+	if (ImGui::CollapsingHeader("Options")) {
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, previousWindowPadding);
+
+		const char* viewingModes[] = { "Single Image", "Manual Compare", "Auto Compare" };
+
+		if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int)viewMode], 0)) {
+			for (int i = 0; i < 3; i++) {
+				const bool selected = i == static_cast<int>(viewMode);
+				if (ImGui::Selectable(viewingModes[i], selected)) {
+					updateViewMode = true;
+					newViewMode = i;
+				}
+
+				if (selected) {
+					ImGui::SetItemDefaultFocus();
+				}
 			}
-
-			if (selected) {
-				ImGui::SetItemDefaultFocus();
-			}
+			ImGui::EndCombo();
 		}
-		ImGui::EndCombo();
+
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(90, 90, 90, 255));
+		ImGui::Text("?");
+		ImGui::PopStyleColor();
+		ImGui::SetItemTooltip("info about viewing modes");
+
+		ImGui::Checkbox("Hide skipped images", &hideSkippedImages);
+
+		if (viewMode == ViewMode_Single) {
+			ImGui::BeginDisabled();
+		}
+
+		static bool movementLocked = true;
+		if (ImGui::Checkbox("Lock movement", &movementLocked)) {
+			onMovementLock(movementLocked);
+		}
+
+		if (viewMode == ViewMode_Single) {
+			ImGui::EndDisabled();
+		}
+
+		ImGui::PopStyleVar();
 	}
-
-	ImGui::SameLine();
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(90, 90, 90, 255));
-	ImGui::Text("?");
-	ImGui::PopStyleColor();
-	ImGui::SetItemTooltip("info about viewing modes");
-
-	ImGui::Checkbox("Hide skipped images", &hideSkippedImages);
-
-	if (viewMode == ViewMode_Single) {
-		ImGui::BeginDisabled();
-	}
-
-	static bool movementLocked = true;
-	if (ImGui::Checkbox("Lock movement", &movementLocked)) {
-		onMovementLock(movementLocked);
-	}
-
-	if (viewMode == ViewMode_Single) {
-		ImGui::EndDisabled();
-	}
+	ImGui::EndChild();
+	ImGui::PopStyleVar();
 
 	ImGui::Spacing();
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	ImGui::Text("Group %d", selectedGroup);
+	if (showPreviewProgress) {
+		renderPreviewProgress();
+	}
+
+	ImGui::Text("Group %d", selectedGroup + 1);
 	ImGui::Spacing();
 
 	static int hoveredChildIndex = -1;
@@ -553,6 +586,20 @@ void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 	ImGui::EndChild();
 }
 
+void UI::renderPreviewProgress() {
+	ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
+	ImGui::Text("Loading image information");
+	ImGui::PopStyleColor();
+
+	ImGui::PushStyleColor(ImGuiCol_PlotHistogram, Colors::green);
+	ImGui::ProgressBar(previewProgress);
+	ImGui::PopStyleColor();
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+}
+
 std::string UI::bytesToSizeString(int bytes) {
 	if (bytes < 1024) {
 		return std::format("{} bytes", bytes);
@@ -674,4 +721,12 @@ void UI::skippedImage() {
 		selectedImages[imageView] = newImage;
 		onImageSelected(imageView, newImage);
 	}
+}
+
+void UI::setShowPreviewProgress(bool enabled) {
+	showPreviewProgress = enabled;
+}
+
+void UI::setPreviewProgress(float progress) {
+	previewProgress = progress;
 }

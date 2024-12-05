@@ -136,14 +136,19 @@ void Application::frameUpdate() {
     case ProcessingState_LoadingDirectory:
         if (directoryLoaded.load()) {
             directoryLoaded.store(false);
-            processingState = ProcessingState_None;
+            processingState = ProcessingState_LoadingPreviews;
+            ui->setShowPreviewProgress(true);
             cache->startInitialTextureLoads();
             generateInitialGroup(groups, cache->getImages());
         }
         break;
-    case ProcessingState_LoadingImages:
-        break;
-    case ProcessingState_GeneratingGroups:
+    case ProcessingState_LoadingPreviews:
+        if (cache->previewLoadingComplete()) {
+            processingState = ProcessingState_None;
+            ui->setShowPreviewProgress(false);
+        } else {
+            ui->setPreviewProgress(cache->getPreviewLoadProgress());
+        }
         break;
     }
 }
