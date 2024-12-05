@@ -8,8 +8,9 @@
 
 enum ControlPanelState {
     ControlPanel_NothingLoaded = 0,
-    ControlPanel_ShowGroups = 1,
-    ControlPanel_ShowFiles = 2
+    ControlPanel_DirectoryLoading = 1,
+    ControlPanel_ShowGroups = 2,
+    ControlPanel_ShowFiles = 3
 };
 
 enum ViewMode {
@@ -26,6 +27,7 @@ public:
     int getCurrentGroupIndex() const;
     glm::ivec2 getImageTargetSize() const;
     glm::ivec2 getImageTargetPosition(int imageView = 0) const;
+    void setControlPanelState(ControlPanelState newState);
 
     // For all relevant image views, update the selected image to the next unskipped image that is not
     // also used by another image view. If there are no more unskipped images, the selected image is

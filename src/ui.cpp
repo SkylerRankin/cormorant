@@ -108,6 +108,11 @@ void UI::renderFrame() {
 		ImGui::TextWrapped("To open an image directory, use File > Open.");
 		ImGui::PopStyleColor();
 		break;
+	case ControlPanel_DirectoryLoading:
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
+		ImGui::TextWrapped("Searching for images in directory...");
+		ImGui::PopStyleColor();
+		break;
 	case ControlPanel_ShowGroups:
 		renderControlPanelGroups();
 		break;
@@ -133,7 +138,6 @@ void UI::renderFrame() {
 		openDirectoryPicker = false;
 		char const* result = tinyfd_selectFolderDialog("Image directory", nullptr);
 		if (result != nullptr) {
-			controlPanelState = ControlPanel_ShowGroups;
 			onDirectoryOpened(result);
 		}
 	}
@@ -644,6 +648,10 @@ glm::ivec2 UI::getImageTargetSize() const {
 
 glm::ivec2 UI::getImageTargetPosition(int imageView) const {
 	return imageTargetPositions[imageView];
+}
+
+void UI::setControlPanelState(ControlPanelState newState) {
+	controlPanelState = newState;
 }
 
 void UI::goToNextUnskippedImage() {

@@ -13,6 +13,7 @@ Application::Application(GLFWwindow* window) : window(window) {
     // Setup UI callbacks
     ui->onDirectoryOpened = [this](std::string path) -> void {
         processingState = ProcessingState_LoadingDirectory;
+        ui->setControlPanelState(ControlPanel_DirectoryLoading);
         cache->initCacheFromDirectory(path, directoryLoaded);
     };
 
@@ -140,6 +141,7 @@ void Application::frameUpdate() {
             ui->setShowPreviewProgress(true);
             cache->startInitialTextureLoads();
             generateInitialGroup(groups, cache->getImages());
+            ui->setControlPanelState(ControlPanel_ShowGroups);
         }
         break;
     case ProcessingState_LoadingPreviews:
