@@ -4,6 +4,12 @@
 #include <map>
 #include "cache.h"
 
+struct ImageGroup {
+	std::vector<int> ids;
+	int savedCount;
+	int skippedCount;
+};
+
 enum GroupParam {
 	GroupParam_Time = 0,
 };
@@ -14,5 +20,5 @@ struct GroupParameters {
 	int timeSeconds = 10;
 };
 
-void generateInitialGroup(std::vector<std::vector<int>>& groups, const std::map<int, Image>& images);
-void generateGroups(std::vector<std::vector<int>>& groups, GroupParameters& parameters, const std::map<int, Image>& images);
+void generateInitialGroup(std::vector<ImageGroup>& groups, const std::map<int, Image>& images);
+void generateGroups(std::vector<ImageGroup>& groups, GroupParameters& parameters, const std::map<int, Image>& images);

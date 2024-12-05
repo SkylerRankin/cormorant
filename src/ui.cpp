@@ -9,7 +9,7 @@
 #include "styles.h"
 #include "ui.h"
 
-UI::UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
+UI::UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
 	: imageViewTextures(textureIDs), imageTargetSize(glm::ivec2(0, 0)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
 	IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -226,9 +226,22 @@ void UI::renderControlPanelGroups() {
 		ImGui::Text("%d Groups", groups.size());
 	}
 
-	ImGui::PushStyleColor(ImGuiCol_Text, Colors::yellow);
-	ImGui::TextWrapped("? groups with 0 selections");
-	ImGui::PopStyleColor();
+	int countGroupsWithNoSaves = 0;
+	for (const ImageGroup& group : groups) {
+		if (group.savedCount == 0 && group.skippedCount < group.ids.size()) {
+			countGroupsWithNoSaves++;
+		}
+	}
+
+	if (countGroupsWithNoSaves == 0) {
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::green);
+		ImGui::TextWrapped("All groups have at least 1 saved image");
+		ImGui::PopStyleColor();
+	} else {
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::yellow);
+		ImGui::TextWrapped("%d group%s with no saved images", countGroupsWithNoSaves, countGroupsWithNoSaves == 1 ? "" : "s");
+		ImGui::PopStyleColor();
+	}
 
 	ImGui::Spacing();
 
@@ -245,13 +258,23 @@ void UI::renderControlPanelGroups() {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 
-			unsigned int textureId = imageCache->getImage(groups[i][0])->previewTextureId;
+			unsigned int textureId = imageCache->getImage(groups[i].ids[0])->previewTextureId;
 			ImGui::Image(textureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
 
 			ImGui::TableSetColumnIndex(1);
 			ImGui::Text("Group %d", i + 1);
 			ImGui::Separator();
-			ImGui::Text("%d images", groups[i].size());
+			ImGui::Text("%d image%s", groups[i].ids.size(), groups[i].ids.size() == 1 ? "" : "s");
+
+			if (groups[i].skippedCount == groups[i].ids.size()) {
+				ImGui::Text("All images skipped");
+			} else {
+				bool noSavedImages = groups[i].savedCount == 0;
+				if (noSavedImages) ImGui::PushStyleColor(ImGuiCol_Text, Colors::yellow);
+				ImGui::Text("%d saved, %d skipped", groups[i].savedCount, groups[i].skippedCount);
+				if (noSavedImages) ImGui::PopStyleColor();
+			}
+
 			ImGui::EndTable();
 		}
 		ImGui::EndChild();
@@ -354,6 +377,7 @@ void UI::renderControlPanelFiles() {
 	}
 
 	ImGui::Text("Group %d", selectedGroup + 1);
+	ImGui::Text("%d saved, %d skipped", groups[selectedGroup].savedCount, groups[selectedGroup].skippedCount);
 	ImGui::Spacing();
 
 	static int hoveredChildIndex = -1;
@@ -361,19 +385,19 @@ void UI::renderControlPanelFiles() {
 
 	ImGui::BeginChild("files_scroll_window", ImVec2(-1, -1), 0, 0);
 
-	for (int i : groups[selectedGroup]) {
-		const Image* image = imageCache->getImage(i);
+	for (int imageID : groups[selectedGroup].ids) {
+		const Image* image = imageCache->getImage(imageID);
 
 		if (image->skipped && hideSkippedImages) continue;
 
-		if (i == selectedImages[0] || i == selectedImages[1]) {
+		if (imageID == selectedImages[0] || imageID == selectedImages[1]) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 255));
-		} else if (i == hoveredChildIndex) {
+		} else if (imageID == hoveredChildIndex) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
 		}
 
-		ImGui::BeginChild(std::format("file_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
-		if (ImGui::BeginTable(std::format("file_table_{}", i).c_str(), 3, ImGuiTableFlags_NoBordersInBody)) {
+		ImGui::BeginChild(std::format("file_child_{}", imageID).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+		if (ImGui::BeginTable(std::format("file_table_{}", imageID).c_str(), 3, ImGuiTableFlags_NoBordersInBody)) {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 
@@ -389,9 +413,9 @@ void UI::renderControlPanelFiles() {
 				ImGui::PushStyleColor(ImGuiCol_Text, Colors::textDisabled);
 			}
 
-			if (viewMode == ViewMode_ManualCompare && selectedImages[0] == i) {
+			if (viewMode == ViewMode_ManualCompare && selectedImages[0] == imageID) {
 				ImGui::Text(std::format("{} - Left", image->filename).c_str());
-			} else if (viewMode == ViewMode_ManualCompare && selectedImages[1] == i) {
+			} else if (viewMode == ViewMode_ManualCompare && selectedImages[1] == imageID) {
 				ImGui::Text(std::format("{} - Right", image->filename).c_str());
 			} else {
 				ImGui::Text(image->filename.c_str());
@@ -416,15 +440,15 @@ void UI::renderControlPanelFiles() {
 				ImGui::PopStyleColor();
 			}
 			
-			if (i == hoveredChildIndex && viewMode == ViewMode_ManualCompare) {
+			if (imageID == hoveredChildIndex && viewMode == ViewMode_ManualCompare) {
 				ImGui::TableSetColumnIndex(2);
 				if (ImGui::Button("Left", ImVec2(50, 20))) {
-					selectedImages[0] = i;
+					selectedImages[0] = imageID;
 					onImageSelected(0, selectedImages[0]);
 				}
 
 				if (ImGui::Button("Right", ImVec2(50, 20))) {
-					selectedImages[1] = i;
+					selectedImages[1] = imageID;
 					onImageSelected(1, selectedImages[1]);
 				}
 			}
@@ -434,18 +458,18 @@ void UI::renderControlPanelFiles() {
 
 		ImGui::EndChild();
 
-		if (i == hoveredChildIndex || i == selectedImages[0] || i == selectedImages[1]) {
+		if (imageID == hoveredChildIndex || imageID == selectedImages[0] || imageID == selectedImages[1]) {
 			ImGui::PopStyleColor();
 		}
 
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly)) {
 			ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-			hoveredChildIndex = i;
+			hoveredChildIndex = imageID;
 			anyChildHovered = true;
 		}
 
 		if (ImGui::IsItemClicked() && viewMode == ViewMode_Single) {
-			selectedImages[0] = i;
+			selectedImages[0] = imageID;
 			onImageSelected(0, selectedImages[0]);
 		}
 	}
@@ -628,8 +652,8 @@ void UI::goToNextUnskippedImage() {
 
 		// Find index of selected image within the group
 		int index = -1;
-		for (int i = 0; i < groups[selectedGroup].size(); i++) {
-			if (selectedImages[imageView] == groups[selectedGroup][i]) {
+		for (int i = 0; i < groups[selectedGroup].ids.size(); i++) {
+			if (selectedImages[imageView] == groups[selectedGroup].ids[i]) {
 				index = i;
 				break;
 			}
@@ -638,8 +662,8 @@ void UI::goToNextUnskippedImage() {
 		if (index == -1) return;
 
 		// Find the next image that is not skipped
-		for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
-			int newImage = groups[selectedGroup][i];
+		for (int i = index + 1; i < groups[selectedGroup].ids.size(); i++) {
+			int newImage = groups[selectedGroup].ids[i];
 			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
@@ -656,8 +680,8 @@ void UI::goToPreviousUnskippedImage() {
 
 		// Find index of selected image within the group
 		int index = -1;
-		for (int i = 0; i < groups[selectedGroup].size(); i++) {
-			if (selectedImages[imageView] == groups[selectedGroup][i]) {
+		for (int i = 0; i < groups[selectedGroup].ids.size(); i++) {
+			if (selectedImages[imageView] == groups[selectedGroup].ids[i]) {
 				index = i;
 				break;
 			}
@@ -667,7 +691,7 @@ void UI::goToPreviousUnskippedImage() {
 
 		// Find the previous image that is not skipped
 		for (int i = index - 1; i >= 0; i--) {
-			int newImage = groups[selectedGroup][i];
+			int newImage = groups[selectedGroup].ids[i];
 			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
@@ -687,8 +711,8 @@ void UI::skippedImage() {
 
 		// Find index of selected image within the group
 		int index = -1;
-		for (int i = 0; i < groups[selectedGroup].size(); i++) {
-			if (selectedImages[imageView] == groups[selectedGroup][i]) {
+		for (int i = 0; i < groups[selectedGroup].ids.size(); i++) {
+			if (selectedImages[imageView] == groups[selectedGroup].ids[i]) {
 				index = i;
 				break;
 			}
@@ -697,8 +721,8 @@ void UI::skippedImage() {
 		if (index == -1) continue;
 
 		// Search forward for a non-skipped image
-		for (int i = index + 1; i < groups[selectedGroup].size(); i++) {
-			int newImage = groups[selectedGroup][i];
+		for (int i = index + 1; i < groups[selectedGroup].ids.size(); i++) {
+			int newImage = groups[selectedGroup].ids[i];
 			if (!imageCache->getImage(newImage)->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
 				selectedImages[imageView] = newImage;
 				onImageSelected(imageView, newImage);
@@ -708,8 +732,8 @@ void UI::skippedImage() {
 
 		// Search backward for a non-skipped image
 		for (int i = index - 1; i >= 0; i--) {
-			int newImage = groups[selectedGroup][i];
-			if (!imageCache->getImage(groups[selectedGroup][i])->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
+			int newImage = groups[selectedGroup].ids[i];
+			if (!imageCache->getImage(groups[selectedGroup].ids[i])->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
 				selectedImages[imageView] = newImage;
 				onImageSelected(imageView, newImage);
 				return;

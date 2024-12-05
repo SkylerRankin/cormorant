@@ -31,7 +31,7 @@ private:
 	ImageViewer* imageViewer[2];
 	UI* ui;
 	ImageCache* cache;
-	std::vector<std::vector<int>> groups;
+	std::vector<ImageGroup> groups;
 	GroupParameters groupParameters;
 	ViewMode viewMode = ViewMode_Single;
 	bool imageViewMovementLocked = true;

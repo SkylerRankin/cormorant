@@ -20,7 +20,7 @@ enum ViewMode {
 
 class UI {
 public:
-    UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
+    UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
     ~UI();
     void renderFrame();
     int getCurrentGroupIndex() const;
@@ -55,7 +55,7 @@ private:
     const glm::ivec2 previewImageSize{75, 75};
 
     std::array<GLuint, 2> imageViewTextures;
-    const std::vector<std::vector<int>>& groups;
+    const std::vector<ImageGroup>& groups;
     GroupParameters& groupParameters;
     ImageCache* imageCache;
     glm::ivec2 imageTargetSize;

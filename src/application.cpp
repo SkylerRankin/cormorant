@@ -18,12 +18,12 @@ Application::Application(GLFWwindow* window) : window(window) {
 
     ui->onGroupSelected = [this](int group) -> void {
         // Preload images in the selected group
-        cache->useImagesFullTextures(groups.at(group));
+        cache->useImagesFullTextures(groups.at(group).ids);
     };
 
     ui->onImageSelected = [this](int imageView, int id) -> void {
         int indexInGroup = -1;
-        std::vector<int>& group = groups.at(ui->getCurrentGroupIndex());
+        std::vector<int>& group = groups.at(ui->getCurrentGroupIndex()).ids;
         for (int i = 0; i < group.size(); i++) {
             if (group[i] == id) {
                 indexInGroup = i;
@@ -260,6 +260,22 @@ bool Application::mouseOverlappingImage(int imageView) {
 
 void Application::toggleSkipImage(int id) {
     Image* image = cache->getImage(id);
+
+    // TODO: have a mapping from image id to group index to avoid this linear search
+    for (ImageGroup& group : groups) {
+        if (std::find(group.ids.begin(), group.ids.end(), id) != group.ids.end()) {
+            if (image->skipped) {
+                group.skippedCount--;
+            } else {
+                group.skippedCount++;
+                if (image->saved) {
+                    group.savedCount--;
+                }
+            }
+            break;
+        }
+    }
+
     image->skipped = !image->skipped;
     image->saved = false;
     ui->skippedImage();
@@ -267,6 +283,21 @@ void Application::toggleSkipImage(int id) {
 
 void Application::toggleSaveImage(int id) {
     Image* image = cache->getImage(id);
+
+    for (ImageGroup& group : groups) {
+        if (std::find(group.ids.begin(), group.ids.end(), id) != group.ids.end()) {
+            if (image->saved) {
+                group.savedCount--;
+            } else {
+                group.savedCount++;
+                if (image->skipped) {
+                    group.skippedCount--;
+                }
+            }
+            break;
+        }
+    }
+
     image->saved = !image->saved;
     image->skipped = false;
 }
