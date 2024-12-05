@@ -13,6 +13,7 @@ set(CXX_HEADERS
     include/frame_buffer.h
     include/glCommon.h
     include/imageView.h
+    include/styles.h
     include/ui.h
 )
 set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)

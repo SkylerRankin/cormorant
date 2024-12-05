@@ -6,6 +6,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <tinyfiledialogs.h>
+#include "styles.h"
 #include "ui.h"
 
 UI::UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<std::vector<int>>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
@@ -21,6 +22,8 @@ UI::UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<s
 	// Disable ImGui saving the layout modifications to a .ini file
 	io.IniFilename = nullptr;
 	io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
+
+	setGlobalStyles();
 }
 
 UI::~UI() {
@@ -101,7 +104,7 @@ void UI::renderFrame() {
 
 	switch (controlPanelState) {
 	case ControlPanel_NothingLoaded:
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(90, 90, 90, 255));
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
 		ImGui::TextWrapped("To open an image directory, use File > Open.");
 		ImGui::PopStyleColor();
 		break;
@@ -157,7 +160,7 @@ void UI::renderControlPanelGroups() {
 		ImGui::Checkbox("Time", &groupParameters.timeEnabled);
 
 		ImGui::SameLine();
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(90, 90, 90, 255));
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
 		ImGui::Text("?");
 		ImGui::PopStyleColor();
 		ImGui::SetItemTooltip("Maximum seconds between images within the same group.");
@@ -211,7 +214,7 @@ void UI::renderControlPanelGroups() {
 		ImGui::Text("%d Groups", groups.size());
 	}
 
-	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(168, 143, 50, 255));
+	ImGui::PushStyleColor(ImGuiCol_Text, Colors::yellow);
 	ImGui::TextWrapped("? groups with 0 selections");
 	ImGui::PopStyleColor();
 
@@ -350,7 +353,7 @@ void UI::renderControlPanelFiles() {
 			if (image->saved) {
 				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(69, 173, 73, 255));
 			} else if (image->skipped) {
-				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(60, 60, 60, 255));
+				ImGui::PushStyleColor(ImGuiCol_Text, Colors::textDisabled);
 			}
 
 			if (viewMode == ViewMode_ManualCompare && selectedImages[0] == i) {
@@ -509,7 +512,10 @@ void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 
 	ImGui::SetNextItemAllowOverlap();
 	ImGui::SetNextWindowPos(ImVec2(position.x, position.y));
-	ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(0, 0, 0, 0));
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::transparent);
+	ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray3Transparent);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::gray4Transparent);
+
 	ImGui::BeginChild("right_controls", controlSize);
 
 	ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, buttonSpacing);
@@ -519,28 +525,31 @@ void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 	bool imageSaved = image->saved;
 	bool imageSkipped = image->skipped;
 
-	if (imageSaved) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(69, 173, 73, 255));
+	if (imageSaved) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
 	if (ImGui::Button("Saved", buttonSize)) {
 		onSaveImage(id);
 	}
+	if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 	if (imageSaved) ImGui::PopStyleColor();
 
 	ImGui::SameLine();
 
-	if (imageSkipped) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(69, 173, 73, 255));
+	if (imageSkipped) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
 	if (ImGui::Button("Skipped", buttonSize)) {
 		onSkipImage(id);
 	}
+	if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 	if (imageSkipped) ImGui::PopStyleColor();
 
 	ImGui::SameLine();
 	if (ImGui::Button("Reset", buttonSize)) {
 		onResetImageTransform(imageView);
 	}
+	if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 
 	ImGui::PopStyleVar();
 
-	ImGui::PopStyleColor();
+	ImGui::PopStyleColor(3);
 	ImGui::EndChild();
 }
 
