@@ -29,8 +29,8 @@ private:
 	glm::ivec2 imageSize;
 	FrameBuffer frameBuffer;
 
-	const float zoomSpeed = 0.5f;
-	float currentZoom = 1.0f;
+	const float zoomSpeed = 0.75f;
+	float currentZoom = 0.0f;
 	glm::vec2 panOffset = glm::vec2(0, 0);
 
 	GLuint shaderProgram;
@@ -42,4 +42,5 @@ private:
 	void renderSingleImage();
 	void updateBaseImageTransform();
 	void updatePanZoomTransform();
+	float getZoomFactor(float zoom);
 };

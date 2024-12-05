@@ -83,7 +83,7 @@ void ImageViewer::zoom(int amount, glm::ivec2 position) {
 	// The screen space offset from current pixel position to its position after scaling. Need to use
 	// the ratio of current zoom to previous here. The original point was already scaled by the previous
 	// zoom factor, so only the additional zoom should be used.
-	glm::vec2 offset = screenSpaceDiff * (currentZoom / previousZoom) - screenSpaceDiff;
+	glm::vec2 offset = screenSpaceDiff * (getZoomFactor(currentZoom) / getZoomFactor(previousZoom)) - screenSpaceDiff;
 	offset.y *= -1;
 	panOffset -= offset;
 	updatePanZoomTransform();
@@ -238,7 +238,8 @@ void ImageViewer::updateBaseImageTransform() {
 void ImageViewer::updatePanZoomTransform() {
 	glUseProgram(shaderProgram);
 	glm::mat4 identity = glm::mat4(1.0f);
-	glm::mat4 scale = glm::scale(identity, glm::vec3(currentZoom, currentZoom, 1.0f));
+	float zoomFactor = getZoomFactor(currentZoom);
+	glm::mat4 scale = glm::scale(identity, glm::vec3(zoomFactor, zoomFactor, 1.0f));
 	glm::mat4 translate = glm::translate(identity, glm::vec3(panOffset, 0.0f));
 	glm::mat4 transform = translate * scale;
 
@@ -247,7 +248,11 @@ void ImageViewer::updatePanZoomTransform() {
 }
 
 void ImageViewer::resetTransform() {
-	currentZoom = 1.0f;
+	currentZoom = 0.0f;
 	panOffset = glm::vec2(0, 0);
 	updatePanZoomTransform();
+}
+
+float ImageViewer::getZoomFactor(float zoom) {
+	return powf(1.25f, zoom);
 }
