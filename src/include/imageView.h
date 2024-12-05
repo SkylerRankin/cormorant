@@ -27,6 +27,7 @@ private:
 	const std::map<int, Image>& images;
 	glm::ivec2 imageTargetSize{ 1, 1 };
 	glm::ivec2 imageSize;
+	glm::vec3 imageBaseScale;
 	FrameBuffer frameBuffer;
 
 	const float zoomSpeed = 0.75f;
@@ -43,4 +44,9 @@ private:
 	void updateBaseImageTransform();
 	void updatePanZoomTransform();
 	float getZoomFactor(float zoom);
+	/*
+	Modifies the pan offset so that backgrouund space is never shown unless required by
+	the image's aspect ratio.
+	*/
+	void clampPanToEdges();
 };

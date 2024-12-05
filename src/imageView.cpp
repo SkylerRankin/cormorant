@@ -64,14 +64,18 @@ void ImageViewer::updateTargetSize(glm::ivec2 newSize) {
 
 /*
 Zooming is relative to the mouse position. This means the pixel under the mouse should not be
-translated with zooming. When the mouse is not over a pixel in the image, the zoom is relative
-to the center of the image.
+translated with zooming. If the zoom position would require additional background space to be
+shown, then the pan offset update is modified by a call to `clampPanToEdges`.
 */
 void ImageViewer::zoom(int amount, glm::ivec2 position) {
+	if (imageID == -1) {
+		return;
+	}
+
 	float previousZoom = currentZoom;
 	currentZoom += zoomSpeed * amount;
-	if (currentZoom < 1.0f) {
-		currentZoom = 1.0f;
+	if (currentZoom < 0.0f) {
+		currentZoom = 0.0f;
 	}
 
 	// Current center of image, in screen space coordinates
@@ -86,6 +90,7 @@ void ImageViewer::zoom(int amount, glm::ivec2 position) {
 	glm::vec2 offset = screenSpaceDiff * (getZoomFactor(currentZoom) / getZoomFactor(previousZoom)) - screenSpaceDiff;
 	offset.y *= -1;
 	panOffset -= offset;
+	clampPanToEdges();
 	updatePanZoomTransform();
 }
 
@@ -97,8 +102,13 @@ movement.
 `panOffset` stores the screen space offset from 0,0 to the current center of the image.
 */
 void ImageViewer::pan(glm::ivec2 offset) {
+	if (imageID == -1) {
+		return;
+	}
+
 	panOffset.x += offset.x / (float)imageTargetSize.x * 2.0f;
 	panOffset.y += -1 * offset.y / (float)imageTargetSize.y * 2.0f;
+	clampPanToEdges();
 	updatePanZoomTransform();
 }
 
@@ -224,10 +234,12 @@ void ImageViewer::updateBaseImageTransform() {
 	glm::mat4 transform = glm::mat4(1.0f);
 	if (windowAspectRatio > imageAspectRatio) {
 		// Shrink quad horizontally
-		transform = glm::scale(transform, glm::vec3(imageAspectRatio / windowAspectRatio, 1.0f, 1.0f));
+		imageBaseScale = glm::vec3(imageAspectRatio / windowAspectRatio, 1.0f, 1.0f);
+		transform = glm::scale(transform, imageBaseScale);
 	} else if (windowAspectRatio < imageAspectRatio) {
 		// Shrink quad vertically
-		transform = glm::scale(transform, glm::vec3(1.0f, windowAspectRatio / imageAspectRatio, 1.0f));
+		imageBaseScale = glm::vec3(1.0f, windowAspectRatio / imageAspectRatio, 1.0f);
+		transform = glm::scale(transform, imageBaseScale);
 	}
 
 	glUseProgram(shaderProgram);
@@ -255,4 +267,36 @@ void ImageViewer::resetTransform() {
 
 float ImageViewer::getZoomFactor(float zoom) {
 	return powf(1.25f, zoom);
+}
+
+float min(float a, float b) {
+	return a < b ? a : b;
+}
+
+float max(float a, float b) {
+	return a > b ? a : b;
+}
+
+void ImageViewer::clampPanToEdges() {
+	float zoomFactor = getZoomFactor(currentZoom);
+
+	// Check if left edge is too far right
+	if (-imageBaseScale.x * zoomFactor + panOffset.x > max(-imageBaseScale.x * zoomFactor, -1.0f)) {
+		panOffset.x = max(-imageBaseScale.x * zoomFactor, -1.0f) - (-imageBaseScale.x * zoomFactor);
+	}
+
+	// Check if right edge is too far left
+	if (imageBaseScale.x * zoomFactor + panOffset.x < min(imageBaseScale.x * zoomFactor, 1.0f)) {
+		panOffset.x = min(imageBaseScale.x * zoomFactor, 1.0f) - (imageBaseScale.x * zoomFactor);
+	}
+
+	// Check if top edge is too far down
+	if (imageBaseScale.y * zoomFactor + panOffset.y < min(imageBaseScale.y * zoomFactor, 1.0f)) {
+		panOffset.y = min(imageBaseScale.y * zoomFactor, 1.0f) - (imageBaseScale.y * zoomFactor);
+	}
+
+	// Check if bottom egge is too far up
+	if (-imageBaseScale.y * zoomFactor + panOffset.y > max(-imageBaseScale.y * zoomFactor, -1.0f)) {
+		panOffset.y = max(-imageBaseScale.y * zoomFactor, -1.0f) - (-imageBaseScale.y * zoomFactor);
+	}
 }
