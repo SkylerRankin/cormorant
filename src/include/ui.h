@@ -77,6 +77,7 @@ private:
     bool openDirectoryPicker = false;
     bool updateViewMode = false;
     int newViewMode = -1;
+    bool updateFilesScrollbar = false;
 
     void renderControlPanelGroups();
     void renderControlPanelFiles();

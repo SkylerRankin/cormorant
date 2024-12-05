@@ -462,6 +462,11 @@ void UI::renderControlPanelFiles() {
 
 		ImGui::EndChild();
 
+		if (updateFilesScrollbar && imageID == selectedImages[0]) {
+			updateFilesScrollbar = false;
+			ImGui::ScrollToItem();
+		}
+
 		if (imageID == hoveredChildIndex || imageID == selectedImages[0] || imageID == selectedImages[1]) {
 			ImGui::PopStyleColor();
 		}
@@ -655,6 +660,8 @@ void UI::setControlPanelState(ControlPanelState newState) {
 }
 
 void UI::goToNextUnskippedImage() {
+	if (viewMode != ViewMode_Single) return;
+
 	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
 		if (imageView > 0 && viewMode == ViewMode_Single) break;
 
@@ -676,6 +683,7 @@ void UI::goToNextUnskippedImage() {
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
 				onImageSelected(imageView, newImage);
+				updateFilesScrollbar = true;
 				break;
 			}
 		}
@@ -683,6 +691,8 @@ void UI::goToNextUnskippedImage() {
 }
 
 void UI::goToPreviousUnskippedImage() {
+	if (viewMode != ViewMode_Single) return;
+
 	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
 		if (imageView > 0 && viewMode == ViewMode_Single) break;
 
@@ -704,6 +714,7 @@ void UI::goToPreviousUnskippedImage() {
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
 				onImageSelected(imageView, newImage);
+				updateFilesScrollbar = true;
 				break;
 			}
 		}
