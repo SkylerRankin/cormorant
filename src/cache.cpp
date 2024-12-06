@@ -89,6 +89,9 @@ void ImageCache::clear() {
 	textureIds.clear();
 	previewsLoaded.clear();
 
+	previewTexturesTotalBytes = 0;
+	fullResolutionTexturesTotalBytes = 0;
+
 	LRUNode* current = lruHead;
 	while (current) {
 		LRUNode* next = current->next;
@@ -131,6 +134,24 @@ bool ImageCache::previewLoadingComplete() {
 
 float ImageCache::getPreviewLoadProgress() {
 	return previewsLoaded.size() / (float)images.size();
+}
+
+void ImageCache::getUIData(ImageCacheUIData& data) {
+	// Textures
+	data.cacheCapacity = cacheCapacity;
+	data.previewTextureSize = previewTextureSize;
+	data.previewCount = static_cast<int>(previewsLoaded.size());
+	data.fullResolutionCount = static_cast<int>(textureIds.size());
+	data.estimatedPreviewBytes = previewTexturesTotalBytes;
+	data.estimatedFullTextureBytes = fullResolutionTexturesTotalBytes;
+
+	// Queues
+	data.imageLoadingThreads = imageLoadThreads;
+	data.imageQueueSize = static_cast<int>(imageQueue.size());
+	data.availablePBOQueueSize = static_cast<int>(availablePBOQueue.size());
+	data.pendingImageQueueSize = static_cast<int>(pendingImageQueue.size());
+	data.textureQueueSize = static_cast<int>(textureQueue.size());
+	data.pendingPBOSize = static_cast<int>(pboToFence.size());
 }
 
 void ImageCache::startInitialTextureLoads() {
@@ -455,13 +476,17 @@ void ImageCache::processTextureQueue() {
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 		glBindTexture(GL_TEXTURE_2D, 0);
 
+		u64 totalBytes = static_cast<u64>(textureSize.x) * static_cast<u64>(textureSize.y) * 3ULL;
+
 		if (entry.isPreview) {
 			image.previewLoaded = true;
 			if (previewsLoaded.size() < images.size()) {
 				previewsLoaded.insert(image.id);
 			}
+			previewTexturesTotalBytes += totalBytes;
 		} else {
 			image.imageLoaded = true;
+			fullResolutionTexturesTotalBytes += totalBytes;
 		}
 	}
 }
@@ -591,6 +616,8 @@ void ImageCache::evictOldestImage() {
 	image.imageLoaded = false;
 	glDeleteTextures(1, &image.fullTextureId);
 	textureIds.erase(image.fullTextureId);
+
+	fullResolutionTexturesTotalBytes -= static_cast<u64>(image.size.x) * static_cast<u64>(image.size.y) * 3ULL;
 
 	imageToLRUNode.erase(removedID);
 

@@ -5,13 +5,16 @@
 #include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "implot.h"
 #include <tinyfiledialogs.h>
 #include "export.h"
 #include "imageView.h"
+#include "glCommon.h"
 #include "styles.h"
 #include "ui.h"
 #include "res/fontFA6.h"
 #include "res/fontOpenSans.h"
+#include "version.h"
 
 namespace {
 	struct InputState {
@@ -34,18 +37,21 @@ namespace {
 		int newViewMode = -1;
 		bool scrollToSelectedFile = false;
 		bool scrollToTopOfFiles = false;
+
+		std::string glVersionString;
 	};
 
 	InputState inputState;
 	UIState uiState;
 
-	std::string bytesToSizeString(int bytes);
+	std::string bytesToSizeString(unsigned long long bytes);
 }
 
-UI::UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
-	: window(window), config(config), imageTargetSize(glm::ivec2(1, 1)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
+UI::UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters, Monitor* monitor)
+	: window(window), config(config), imageTargetSize(glm::ivec2(1, 1)), groups(groups), imageCache(imageCache), groupParameters(groupParameters), monitor(monitor) {
 	IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+	ImPlot::CreateContext();
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -76,6 +82,7 @@ UI::~UI() {
 	delete imageViewer[1];
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
+	ImPlot::DestroyContext();
 	ImGui::DestroyContext();
 }
 
@@ -220,8 +227,8 @@ void UI::renderFrame(double elapsed) {
 
 	float menuBarHeight;
 
-	if (ImGui::BeginMainMenuBar()) {
-		if (ImGui::BeginMenu("File")) {
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem("Open")) {
 				uiState.openDirectoryPicker = true;
 			}
@@ -252,6 +259,9 @@ void UI::renderFrame(double elapsed) {
 		}
 		if (ImGui::BeginMenu("Help")) {
 			ImGui::MenuItem("About");
+			if (ImGui::MenuItem("Info")) {
+				showStatsWindow = true;
+			}
 			ImGui::EndMenu();
 		}
 	}
@@ -269,7 +279,7 @@ void UI::renderFrame(double elapsed) {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-	ImGui::Begin("main window", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+	ImGui::Begin("main window", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
 	ImGui::SetNextWindowPos(ImVec2(0.0f, menuBarHeight));
 	ImGui::BeginChild("left panel", ImVec2(controlWidth[uiState.viewMode], windowSize.y));
@@ -328,12 +338,16 @@ void UI::renderFrame(double elapsed) {
 	ImGui::End();
 	ImGui::PopStyleVar(2);
 
+	if (showStatsWindow) renderStatsWindow();
+
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	if (uiState.openDirectoryPicker) {
 		uiState.openDirectoryPicker = false;
+		monitor->pauseTimers();
 		char const* result = tinyfd_selectFolderDialog("Image directory", nullptr);
+		monitor->resumeTimers();
 		if (result != nullptr) {
 			directoryPath = std::filesystem::path(result);
 			onDirectoryOpened(result);
@@ -1006,6 +1020,158 @@ void UI::renderPreviewProgress() {
 	ImGui::Spacing();
 }
 
+void UI::renderStatsWindow() {
+	ImGui::SetNextWindowPos(ImVec2(
+		ImGui::GetMainViewport()->Size.x / 2.0f - statsWindowSize.x / 2.0f,
+		ImGui::GetMainViewport()->Size.y / 2.0f - statsWindowSize.y / 2.0f
+	), ImGuiCond_Appearing);
+
+	ImGui::SetNextWindowSize(ImVec2(statsWindowSize.x, statsWindowSize.y), ImGuiCond_Appearing);
+	ImGui::PushStyleColor(ImGuiCol_TitleBg, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_TitleBgActive, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_Border, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_SeparatorActive, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_SeparatorHovered, Colors::greenDark);
+
+	ImGui::Begin("Infomation", &showStatsWindow, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse);
+
+	ImGui::Text("Cormorant v%s", VERSION);
+
+	if (uiState.glVersionString.empty()) {
+		const unsigned char* version = glGetString(GL_VERSION);
+		uiState.glVersionString = std::format("OpenGL Version {}", reinterpret_cast<const char*>(version));
+	}
+	ImGui::Text(uiState.glVersionString.c_str());
+
+	ImGui::Spacing();
+
+	ImageCacheUIData cacheData;
+	imageCache->getUIData(cacheData);
+
+	if (ImGui::CollapsingHeader("Frame Rate")) {
+		std::vector<float> yData;
+		yData.reserve(monitor->frameTimes.size());
+
+		double minFrameTime = FLT_MAX;
+		double maxFrameTime = 0.0f;
+		int i = 0;
+		for (auto x : monitor->frameTimes) {
+			if (monitor->frameTimes[i] > maxFrameTime) {
+				maxFrameTime = monitor->frameTimes[i];
+			}
+			if (monitor->frameTimes[i] < minFrameTime) {
+				minFrameTime = monitor->frameTimes[i];
+			}
+			yData.push_back(static_cast<float>(monitor->frameTimes[i++]));
+		}
+
+		ImGui::BeginTable("fps_table", 2, 0, ImVec2(250, 0));
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Moving average");
+		ImGui::TableSetColumnIndex(1);
+		double ms = monitor->frameTimeAverage;
+		ImGui::Text(std::format("{:.4f} s, {:.0f} FPS", ms, 1 / ms).c_str());
+
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("1k Frame Peak");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text(std::format("{:.4f} s", maxFrameTime).c_str());
+		ImGui::EndTable();
+
+		if (ImPlot::BeginPlot("##frametime_plot", ImVec2(-1, 100), ImPlotFlags_CanvasOnly | ImPlotFlags_NoInputs | ImPlotFlags_NoChild)) {
+			ImPlot::SetupAxes(nullptr, "y", ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoLabel);
+			ImPlot::SetupAxesLimits(0.0, static_cast<double>(yData.size()), minFrameTime * 0.9, maxFrameTime * 1.1, ImPlotCond_Always);
+			ImPlot::PushStyleColor(ImPlotCol_Line, Colors::greenDark);
+			ImPlot::PlotLine("average plot", yData.data(), static_cast<int>(yData.size()));
+			ImPlot::PopStyleColor();
+			ImPlot::EndPlot();
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Textures")) {
+		ImGui::Text("Preview Images");
+		ImGui::Indent();
+		ImGui::BeginTable("previews_table", 2, 0, ImVec2(250, 0));
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Count");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text("%d", cacheData.previewCount);
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Dimensions");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text("%d x %d pixels", cacheData.previewTextureSize.x, cacheData.previewTextureSize.y);
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Estimated size");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text(bytesToSizeString(cacheData.estimatedPreviewBytes).c_str());
+		ImGui::EndTable();
+
+		ImGui::Unindent();
+
+		ImGui::Text("Full Resolution Images");
+		ImGui::Indent();
+		ImGui::BeginTable("images_table", 2, 0, ImVec2(250, 0));
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Cache capacity");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text("%d", cacheData.cacheCapacity);
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Cached textures");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text("%d", cacheData.fullResolutionCount);
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Estimated size");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::Text(bytesToSizeString(cacheData.estimatedFullTextureBytes).c_str());
+		ImGui::EndTable();
+
+		ImGui::Unindent();
+	}
+
+	if (ImGui::CollapsingHeader("Queues")) {
+		ImGui::BeginTable("queues_table", 2, 0, ImVec2(325, 0));
+
+		const char* rowLabels[] = {
+			"Available PBO Queue Size",
+			"Pending Image Queue Size",
+			"Image Queue Threads",
+			"Image Queue Size",
+			"Texture Queue Size",
+			"Pending PBO Map Size"
+		};
+
+		const int rowValues[] = {
+			cacheData.availablePBOQueueSize,
+			cacheData.pendingImageQueueSize,
+			cacheData.imageLoadingThreads,
+			cacheData.imageQueueSize,
+			cacheData.textureQueueSize,
+			cacheData.pendingPBOSize
+		};
+
+		for (int i = 0; i < 6; i++) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text(rowLabels[i]);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("%d", rowValues[i]);
+		}
+
+		ImGui::EndTable();
+	}
+
+	ImGui::End();
+	ImGui::PopStyleColor(5);
+}
+
 void UI::selectImage(int imageView, int id) {
 	selectedImages[imageView] = id;
 	onImageSelected(id);
@@ -1016,13 +1182,15 @@ void UI::selectImage(int imageView, int id) {
 }
 
 namespace {
-std::string bytesToSizeString(int bytes) {
+std::string bytesToSizeString(unsigned long long bytes) {
 	if (bytes < 1024) {
 		return std::format("{} bytes", bytes);
 	} else if (bytes < 1024 * 1024) {
 		return std::format("{} KB", floor(bytes / 1024));
-	} else {
+	} else if (bytes < 1024 * 1024 * 1024) {
 		return std::format("{} MB", floor(bytes / 1024 / 1024));
+	} else {
+		return std::format("{} GB", floor(bytes / 1024 / 1024 / 1024));
 	}
 }
 }

@@ -4,6 +4,7 @@
 #include "config.h"
 #include "glCommon.h"
 #include "group.h"
+#include "stats.h"
 
 enum ProcessingState {
 	ProcessingState_None = 0,
@@ -30,6 +31,7 @@ private:
 	Config config;
 	UI* ui;
 	ImageCache* cache;
+	Monitor* monitor;
 	std::vector<ImageGroup> groups;
 	GroupParameters groupParameters;
 	double previousFrameTime;

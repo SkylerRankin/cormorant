@@ -10,7 +10,8 @@
 
 Application::Application(GLFWwindow* window) : window(window) {
     cache = new ImageCache();
-    ui = new UI(window, config, groups, cache, groupParameters);
+    monitor = new Monitor();
+    ui = new UI(window, config, groups, cache, groupParameters, monitor);
 
     directoryLoaded.store(false);
 
@@ -97,6 +98,8 @@ Application::~Application() {
 }
 
 void Application::frameUpdate() {
+    BlockTimer frameTimer{monitor, Monitor_FrameTime};
+
     double elapsed = glfwGetTime() - previousFrameTime;
     previousFrameTime = glfwGetTime();
 

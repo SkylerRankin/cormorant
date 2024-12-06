@@ -8,6 +8,7 @@
 #include "group.h"
 #include "cache.h"
 #include "config.h"
+#include "stats.h"
 
 enum ControlPanelState {
     ControlPanel_NothingLoaded = 0,
@@ -25,7 +26,7 @@ enum ViewMode {
 
 class UI {
 public:
-    UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
+    UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters, Monitor* monitor);
     ~UI();
     void renderFrame(double elapsed);
     int getCurrentGroupIndex() const;
@@ -71,6 +72,7 @@ private:
     const float viewModeComboWidth = 150.0f;
     const float rightClickMenuWidth = 150.0f;
     const float exportTooltipWidth = 250.0f;
+    const glm::vec2 statsWindowSize{400.0f, 300.0f};
 
     const std::vector<ImageGroup>& groups;
     const Config& config;
@@ -79,11 +81,13 @@ private:
     ImageViewer* imageViewer[2];
     GroupParameters& groupParameters;
     ImageCache* imageCache;
+    Monitor* monitor;
     glm::ivec2 imageTargetSize;
     std::array<glm::ivec2, 2> imageTargetPositions;
     bool allowGroupInteraction = false;
     bool allowExports = false;
     bool showPreviewProgress = false;
+    bool showStatsWindow = false;
     float previewProgress = 0.0f;
 
     ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
@@ -102,6 +106,8 @@ private:
     void renderCompareImageView();
     void renderImageViewOverlay(int imageView, glm::vec2 position);
     void renderPreviewProgress();
+    void renderStatsWindow();
+
     void selectImage(int imageView, int id);
     bool mouseOverlappingImage(int imageView);
 

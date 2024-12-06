@@ -68,8 +68,6 @@ int main() {
     glfwSetErrorCallback(errorCallback);
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(debugCallback, nullptr);
-    const GLubyte* version = glGetString(GL_VERSION);
-    std::cout << "OpenGL version: " << version << std::endl;
 #endif
 
     Application app{window};

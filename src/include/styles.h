@@ -9,6 +9,7 @@ namespace Colors {
 	const ImVec4 textDisabled		= ImVec4(0.24f, 0.24f, 0.24f, 1.00f);
 
 	const ImVec4 green				= ImVec4(0.27f, 0.68f, 0.28f, 1.00f);
+	const ImVec4 greenDark			= ImVec4(0.27f, 0.43f, 0.28f, 1.00f);
 	const ImVec4 yellow				= ImVec4(0.65f, 0.56f, 0.20f, 1.00f);
 
 	const ImVec4 gray1				= ImVec4(0.06f, 0.06f, 0.06f, 1.00f);

@@ -93,6 +93,29 @@ if(NOT imgui_POPULATED)
 
 endif ()
 
+# ------ implot -----------------------------------------------------
+
+FetchContent_Declare(
+    implot
+    GIT_REPOSITORY  https://github.com/epezent/implot.git
+    GIT_TAG         v0.16
+    GIT_SHALLOW     TRUE
+    GIT_PROGRESS    TRUE
+)
+
+FetchContent_GetProperties(implot)
+if(NOT implot)
+    message("Fetching implot")
+    FetchContent_Populate(implot)
+
+    add_library(implot
+        ${implot_SOURCE_DIR}/implot.cpp
+        ${implot_SOURCE_DIR}/implot_items.cpp)
+
+    target_include_directories(implot PUBLIC ${implot_SOURCE_DIR})
+    target_link_libraries(implot PRIVATE imgui)
+endif()
+
 # ------ tinyfiledialogs --------------------------------------------
 
 add_subdirectory(tinyfiledialogs)

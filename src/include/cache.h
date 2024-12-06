@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 #include "glCommon.h"
 
+using u64 = unsigned long long;
+
 struct ImageTimestamp {
 	unsigned short year;
 	unsigned char month;
@@ -87,6 +89,22 @@ struct LRUNode {
 	LRUNode* prev;
 };
 
+struct ImageCacheUIData {
+	glm::ivec2 previewTextureSize{};
+	int cacheCapacity;
+	int imageLoadingThreads;
+	int previewCount;
+	int fullResolutionCount;
+	u64 estimatedPreviewBytes;
+	u64 estimatedFullTextureBytes;
+
+	int imageQueueSize;
+	int textureQueueSize;
+	int pendingImageQueueSize;
+	int availablePBOQueueSize;
+	int pendingPBOSize;
+};
+
 class ImageCache {
 public:
 	ImageCache();
@@ -126,6 +144,8 @@ public:
 	bool previewLoadingComplete();
 	float getPreviewLoadProgress();
 
+	void getUIData(ImageCacheUIData& data);
+
 private:
 	// Max full resolution images to keep stored in GPU at a time
 	const int cacheCapacity = 10;
@@ -150,6 +170,8 @@ private:
 
 	// For debugging
 	std::set<GLuint> textureIds;
+	u64 previewTexturesTotalBytes = 0;
+	u64 fullResolutionTexturesTotalBytes = 0;
 	
 	// Contains ids of all images that have had their image data and preview texture loaded.
 	// Used to track progress of the initial loads before full resolution textures can be

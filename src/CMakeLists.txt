@@ -15,8 +15,10 @@ set(CXX_HEADERS
     include/group.h
     include/frame_buffer.h
     include/imageView.h
+    include/stats.h
     include/styles.h
     include/ui.h
+    include/version.h
     res/fontFA6.h
     res/fontOpenSans.h
     res/icon64.h
@@ -33,6 +35,7 @@ set(CXX_SRCS
     group.cpp
     imageView.cpp
     main.cpp
+    stats.cpp
     ui.cpp
 )
 
@@ -42,7 +45,7 @@ if (WIN32)
 endif()
 
 add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS} ${RESOURCE_FILE})
-target_link_libraries(cormorant PRIVATE glad glfw imgui tinyfiledialogs glm stb_image tinyxml2 tinyEXIF)
+target_link_libraries(cormorant PRIVATE glad glfw imgui implot tinyfiledialogs glm stb_image tinyxml2 tinyEXIF)
 
 # Use the Windows subsystem (instead of console) for Windows release builds.
 if (WIN32)
