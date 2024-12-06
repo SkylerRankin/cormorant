@@ -9,6 +9,7 @@ include_directories(include)
 set(CXX_HEADERS
     include/application.h
     include/cache.h
+    include/export.h
     include/group.h
     include/frame_buffer.h
     include/glCommon.h
@@ -23,6 +24,7 @@ set(CXX_SRCS
     application.cpp
     cache.cpp
     glCommon.cpp
+    export.cpp
     group.cpp
     frame_buffer.cpp
     imageView.cpp

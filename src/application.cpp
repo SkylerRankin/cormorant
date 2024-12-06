@@ -1,3 +1,7 @@
+#include <chrono>
+#include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include "application.h"
 #include "cache.h"
@@ -14,6 +18,7 @@ Application::Application(GLFWwindow* window) : window(window) {
         processingState = ProcessingState_LoadingDirectory;
         ui->setControlPanelState(ControlPanel_DirectoryLoading);
         cache->initCacheFromDirectory(path, directoryLoaded);
+        directoryPath = std::filesystem::path{ path };
     };
 
     ui->onGroupSelected = [this](int group) -> void {
@@ -73,8 +78,6 @@ void Application::frameUpdate() {
         if (cache->previewLoadingComplete()) {
             processingState = ProcessingState_None;
             ui->setShowPreviewProgress(false);
-        } else {
-            ui->setPreviewProgress(cache->getPreviewLoadProgress());
         }
         break;
     }

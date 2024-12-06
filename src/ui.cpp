@@ -6,6 +6,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <tinyfiledialogs.h>
+#include "export.h"
 #include "imageView.h"
 #include "styles.h"
 #include "ui.h"
@@ -29,6 +30,7 @@ namespace {
 		ViewMode viewMode = ViewMode_Single;
 		bool imageViewMovementLocked = true;
 		bool hideSkippedImages = true;
+		bool exportInProgress = false;
 
 		// Data used to defer UI updates until after frame is rendered
 		bool openDirectoryPicker = false;
@@ -151,7 +153,18 @@ void UI::renderFrame() {
             ImGui::EndMenu();
         }
 		if (ImGui::BeginMenu("Export")) {
-			ImGui::MenuItem("Copy Selections");
+			if (imageCache->getImages().size() == 0) {
+				ImGui::BeginDisabled();
+			}
+			if (ImGui::MenuItem("Copy saved images")) {
+				controlPanelState = ControlPanel_SaveImages;
+			}
+			if (ImGui::MenuItem("Save filenames")) {
+				controlPanelState = ControlPanel_SaveFilenames;
+			}
+			if (imageCache->getImages().size() == 0) {
+				ImGui::EndDisabled();
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Help")) {
@@ -222,6 +235,12 @@ void UI::renderFrame() {
 	case ControlPanel_ShowFiles:
 		renderControlPanelFiles();
 		break;
+	case ControlPanel_SaveFilenames:
+		renderControlPanelSaveFilenames();
+		break;
+	case ControlPanel_SaveImages:
+		renderControlPanelSaveImages();
+		break;
 	}
 
 	ImGui::End();
@@ -241,6 +260,7 @@ void UI::renderFrame() {
 		uiState.openDirectoryPicker = false;
 		char const* result = tinyfd_selectFolderDialog("Image directory", nullptr);
 		if (result != nullptr) {
+			directoryPath = std::filesystem::path(result);
 			onDirectoryOpened(result);
 		}
 	}
@@ -618,6 +638,64 @@ void UI::renderControlPanelFiles() {
 	ImGui::EndChild();
 }
 
+void UI::renderControlPanelSaveFilenames() {
+	ImGui::Text("Save filenames");
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (uiState.exportInProgress) {
+		ImGui::TextWrapped("Export in progress...");
+		ImGui::ProgressBar(Export::exportProgress());
+		if (!Export::exportInProgress()) {
+			uiState.exportInProgress = false;
+			controlPanelState = ControlPanel_ShowGroups;
+		}
+	} else {
+		ImGui::TextWrapped("Creates a file containing the filenames of all saved images.");
+		std::string outputPath = Export::filenameOutputPath(directoryPath).string();
+		ImGui::TextWrapped("File location: %s", outputPath.c_str());
+		ImGui::Spacing();
+		if (ImGui::Button("Save", ImVec2(100, 20))) {
+			Export::exportFilenames(directoryPath, imageCache->getImages());
+			uiState.exportInProgress = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel", ImVec2(100, 20))) {
+			controlPanelState = ControlPanel_ShowGroups;
+		}
+	}
+}
+
+void UI::renderControlPanelSaveImages() {
+	ImGui::Text("Save images");
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (uiState.exportInProgress) {
+		ImGui::TextWrapped("Export in progress...");
+		ImGui::ProgressBar(Export::exportProgress());
+		if (!Export::exportInProgress()) {
+			uiState.exportInProgress = false;
+			controlPanelState = ControlPanel_ShowGroups;
+		}
+	} else {
+		std::string outputPath = Export::imageOutputPath(directoryPath).string();
+
+		ImGui::TextWrapped("Copies all saved images into %s.", outputPath.c_str());
+		ImGui::Spacing();
+		if (ImGui::Button("Save", ImVec2(100, 20))) {
+			Export::exportImages(directoryPath, imageCache->getImages());
+			uiState.exportInProgress = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel", ImVec2(100, 20))) {
+			controlPanelState = ControlPanel_ShowGroups;
+		}
+	}
+}
+
 void UI::renderSingleImageView() {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::Begin("right_panel", nullptr);
@@ -758,7 +836,7 @@ void UI::renderPreviewProgress() {
 	ImGui::PopStyleColor();
 
 	ImGui::PushStyleColor(ImGuiCol_PlotHistogram, Colors::green);
-	ImGui::ProgressBar(previewProgress);
+	ImGui::ProgressBar(imageCache->getPreviewLoadProgress());
 	ImGui::PopStyleColor();
 
 	ImGui::Spacing();
@@ -901,10 +979,6 @@ void UI::skippedImage() {
 
 void UI::setShowPreviewProgress(bool enabled) {
 	showPreviewProgress = enabled;
-}
-
-void UI::setPreviewProgress(float progress) {
-	previewProgress = progress;
 }
 
 bool UI::mouseOverlappingImage(int imageView) {

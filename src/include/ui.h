@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <filesystem>
 #include <functional>
 #include <glm/glm.hpp>
 #include "imageView.h"
@@ -11,7 +12,9 @@ enum ControlPanelState {
     ControlPanel_NothingLoaded = 0,
     ControlPanel_DirectoryLoading = 1,
     ControlPanel_ShowGroups = 2,
-    ControlPanel_ShowFiles = 3
+    ControlPanel_ShowFiles = 3,
+    ControlPanel_SaveFilenames = 4,
+    ControlPanel_SaveImages = 5,
 };
 
 class UI {
@@ -30,9 +33,7 @@ public:
     // Called when the skipped flag on an image is changed. This is required because if the selected image is
     // now skipped, the UI should automatically move to the next unskipped image.
     void skippedImage();
-    // Functions for handling the preview loading progress UI
     void setShowPreviewProgress(bool enabled);
-    void setPreviewProgress(float progress);
 
     // Input handling
     void inputClick(int button, int action, int mods);
@@ -65,9 +66,12 @@ private:
     int selectedGroup;
     // IDs of the images, index 0 for the left and single image, and index 1 for the right image.
     std::array<int, 2> selectedImages = {-1, -1};
+    std::filesystem::path directoryPath;
 
     void renderControlPanelGroups();
     void renderControlPanelFiles();
+    void renderControlPanelSaveFilenames();
+    void renderControlPanelSaveImages();
     void renderSingleImageView();
     void renderCompareImageView();
     void renderImageViewOverlay(int imageView, glm::vec2 position);

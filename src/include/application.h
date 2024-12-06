@@ -34,6 +34,7 @@ private:
 	// Data processing
 	ProcessingState processingState = ProcessingState_None;
 	std::atomic_bool directoryLoaded;
+	std::filesystem::path directoryPath{""};
 
 	// When an image is selected using onImageSelected, the next n and
 	// previous m images are also loaded.
