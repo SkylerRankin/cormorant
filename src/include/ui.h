@@ -67,6 +67,7 @@ private:
     float previewProgress = 0.0f;
 
     ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
+    ControlPanelState prevControlPanelState = ControlPanel_NothingLoaded;
     int selectedGroup;
     // IDs of the images, index 0 for the left and single image, and index 1 for the right image.
     std::array<int, 2> selectedImages = {-1, -1};
@@ -77,7 +78,8 @@ private:
     bool openDirectoryPicker = false;
     bool updateViewMode = false;
     int newViewMode = -1;
-    bool updateFilesScrollbar = false;
+    bool scrollToSelectedFile = false;
+    bool scrollToTopOfFiles = false;
 
     void renderControlPanelGroups();
     void renderControlPanelFiles();

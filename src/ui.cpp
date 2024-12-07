@@ -100,6 +100,7 @@ void UI::renderFrame() {
 	ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f));
 	ImGui::End();
 
+	prevControlPanelState = controlPanelState;
 	ImGui::Begin("left_panel", nullptr);
 
 	switch (controlPanelState) {
@@ -148,6 +149,17 @@ void UI::renderFrame() {
 		onViewModeUpdated(newViewMode);
 		updateViewMode = false;
 		newViewMode = -1;
+	}
+
+	// UI updates when leaving a control panel state
+	if (prevControlPanelState != controlPanelState) {
+		switch (prevControlPanelState) {
+		case ControlPanel_ShowFiles:
+			scrollToTopOfFiles = true;
+			break;
+		case ControlPanel_ShowGroups:
+			break;
+		}
 	}
 }
 
@@ -252,6 +264,7 @@ void UI::renderControlPanelGroups() {
 	static int hoveredChildIndex = -1;
 	bool anyChildHovered = false;
 
+	ImGui::BeginChild("groups_scroll_window", ImVec2(-1, -1), 0, 0);
 	for (int i = 0; i < groups.size(); i++) {
 		if (hoveredChildIndex == i) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
@@ -306,6 +319,8 @@ void UI::renderControlPanelGroups() {
 		}
 	}
 
+	ImGui::EndChild();
+
 	if (!anyChildHovered) {
 		hoveredChildIndex = -1;
 	}
@@ -321,7 +336,7 @@ void UI::renderControlPanelFiles() {
 	ImGui::Spacing();
 
 	// The "CollapsingHeader" widget extends its width in both directions by `window->WindowPadding.x * 0.5f`. I'd
-	// prefer the width to match other widgets, so placing the widget within a child window with 0 padding will remove
+	// prefer the width to match other widgets, so placing the widget within a child window with 0 padding removes
 	// this additional width.
 	ImVec2 previousWindowPadding = ImGui::GetStyle().WindowPadding;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -387,8 +402,12 @@ void UI::renderControlPanelFiles() {
 	static int hoveredChildIndex = -1;
 	bool anyChildHovered = false;
 
-	ImGui::BeginChild("files_scroll_window", ImVec2(-1, -1), 0, 0);
+	if (scrollToTopOfFiles) {
+		ImGui::SetNextWindowScroll(ImVec2(0, 0));
+		scrollToTopOfFiles = false;
+	}
 
+	ImGui::BeginChild("files_scroll_window", ImVec2(-1, -1), 0, 0);
 	for (int imageID : groups[selectedGroup].ids) {
 		const Image* image = imageCache->getImage(imageID);
 
@@ -462,8 +481,8 @@ void UI::renderControlPanelFiles() {
 
 		ImGui::EndChild();
 
-		if (updateFilesScrollbar && imageID == selectedImages[0]) {
-			updateFilesScrollbar = false;
+		if (scrollToSelectedFile && imageID == selectedImages[0]) {
+			scrollToSelectedFile = false;
 			ImGui::ScrollToItem();
 		}
 
@@ -683,7 +702,7 @@ void UI::goToNextUnskippedImage() {
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
 				onImageSelected(imageView, newImage);
-				updateFilesScrollbar = true;
+				scrollToSelectedFile = true;
 				break;
 			}
 		}
@@ -714,7 +733,7 @@ void UI::goToPreviousUnskippedImage() {
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
 				onImageSelected(imageView, newImage);
-				updateFilesScrollbar = true;
+				scrollToSelectedFile = true;
 				break;
 			}
 		}
