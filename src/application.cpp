@@ -42,18 +42,12 @@ Application::Application(GLFWwindow* window) : window(window) {
 
             for (int i = 1; i <= preloadNextImageCount; i++) {
                 if (indexInGroup + i >= group.size()) break;
-                int imageID = group.at(indexInGroup + i);
-                if (!images.at(imageID).imageLoaded) {
-                    imageIDs.push_back(imageID);
-                }
+                imageIDs.push_back(group.at(indexInGroup + i));
             }
 
             for (int i = 1; i <= preloadPreviousImageCount; i++) {
                 if (indexInGroup - i < 0) break;
-                int imageID = group.at(indexInGroup - i);
-                if (!images.at(imageID).imageLoaded) {
-                    imageIDs.push_back(imageID);
-                }
+                imageIDs.push_back(group.at(indexInGroup - i));
             }
 
             cache->useImagesFullTextures(imageIDs);

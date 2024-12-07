@@ -56,6 +56,7 @@ void ImageCache::frameUpdate() {
 	processPendingPBOQueue();
 	processPendingImageQueue();
 	processTextureQueue();
+	assert(textureIds.size() <= cacheCapacity && std::format("Number of in-use textures ({}) has exceeded cache capacity ({}).", textureIds.size(), cacheCapacity).c_str());
 }
 
 void ImageCache::initCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded) {
@@ -295,11 +296,16 @@ void ImageCache::processPendingImageQueue() {
 	while (iterations++ < maxIterations) {
 		if (pendingImageQueue.size() == 0 || availablePBOQueue.size() == 0) break;
 
-		PBOQueueEntry pboEntry = availablePBOQueue.front();
-		availablePBOQueue.pop_front();
-
 		ImageQueueEntry imageEntry = pendingImageQueue.front();
 		pendingImageQueue.pop_front();
+		if (
+			(imageEntry.isPreview && images.at(imageEntry.imageID).previewLoaded) ||
+			(!imageEntry.isPreview && images.at(imageEntry.imageID).imageLoaded)) {
+			continue;
+		}
+
+		PBOQueueEntry pboEntry = availablePBOQueue.front();
+		availablePBOQueue.pop_front();
 		imageEntry.pbo = pboEntry.pbo;
 
 		const Image& image = images.at(imageEntry.imageID);
@@ -325,7 +331,7 @@ void ImageCache::processPendingImageQueue() {
 
 void ImageCache::processTextureQueue() {
 	int iterations = 0;
-	while (iterations++ < textureQueueEntriesPerFrame) {
+	while (iterations < textureQueueEntriesPerFrame) {
 		TextureQueueEntry entry;
 		{
 			std::lock_guard<std::mutex> guard(textureQueueMutex);
@@ -336,13 +342,34 @@ void ImageCache::processTextureQueue() {
 
 		Image& image = images.at(entry.imageID);
 
-		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
-		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+		/*
+		If image id is no longer in the LRU list, it must have been evicted in the time
+		that the image data was being read/decoded. The image should not be uploaded in this case.
+		Similarly, if the image is already loaded, there is no need to do an additional upload.
+		*/
+		if (!entry.isPreview && (!imageToLRUNode.contains(image.id) || image.imageLoaded)) {
+			if (!imageToLRUNode.contains(image.id)) image.imageLoaded = false;
+
+			// Unbind the PBO
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
+			glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+
+			// Make this PBO available immediately
+			PBOQueueEntry pboEntry{
+				.pbo = entry.pbo,
+				.mappedBuffer = nullptr
+			};
+			availablePBOQueue.push_back(pboEntry);
+			continue;
+		}
+
+		iterations++;
 
 		GLuint* textureID = entry.isPreview ? &image.previewTextureId : &image.fullTextureId;
 		glm::ivec2& textureSize = entry.isPreview ? image.previewSize : image.size;
 
 		glGenTextures(1, textureID);
+		if (!entry.isPreview) textureIds.insert(*textureID);
 		glBindTexture(GL_TEXTURE_2D, *textureID);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -350,9 +377,10 @@ void ImageCache::processTextureQueue() {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
 		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureSize.x, textureSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 		pboToFence.emplace(entry.pbo, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
 		glBindTexture(GL_TEXTURE_2D, 0);
@@ -425,15 +453,20 @@ void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
 		pendingImageQueue.push_back(entry);
 	}
 
+	// First, find any ids that are already loaded and in the LRU list. Mark these
+	// images as used so they move up in the list and won't be considered for eviction
+	// unnecessarily.
 	for (int i = 0; i <= maxIndex; i++) {
 		int id = ids.at(i);
 		if (imageToLRUNode.contains(id)) {
-			// This image is already somewhere in the LRU list. Move it to the end, making it
-			// the new most recently used image.
 			useLRUNode(imageToLRUNode.at(id));
-		} else {
-			// This image is not in the LRU list. Add it to the end and evict the oldest image
-			// if necessary.
+		}
+	}
+
+	// Second, add any new ids to the list, evicting the oldest when space is needed.
+	for (int i = 0; i <= maxIndex; i++) {
+		int id = ids.at(i);
+		if (!imageToLRUNode.contains(id)) {
 			if (imageToLRUNode.size() == cacheCapacity) {
 				evictOldestImage();
 			}
@@ -495,6 +528,7 @@ void ImageCache::evictOldestImage() {
 	Image& image = images.at(removedID);
 	image.imageLoaded = false;
 	glDeleteTextures(1, &image.fullTextureId);
+	textureIds.erase(image.fullTextureId);
 
 	imageToLRUNode.erase(removedID);
 

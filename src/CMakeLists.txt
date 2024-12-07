@@ -22,6 +22,7 @@ set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
 set(CXX_SRCS
     application.cpp
     cache.cpp
+    glCommon.cpp
     group.cpp
     frame_buffer.cpp
     imageView.cpp

@@ -137,6 +137,9 @@ private:
 	std::mutex imageQueueConditionVariableMutex;
 	std::condition_variable imageQueueConditionVariable;
 	std::map<unsigned int, GLsync> pboToFence;
+
+	// For debugging
+	std::set<GLuint> textureIds;
 	
 	// Contains ids of all images that have had their image data and preview texture loaded.
 	// Used to track progress of the initial loads before full resolution textures can be

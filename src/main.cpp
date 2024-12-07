@@ -31,6 +31,21 @@ static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
     app->onScroll((int) yOffset);
 }
 
+static void debugCallback(GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* userParam) {
+
+    if (id == 131185) return;
+    if (id == 131154) return; // Pixel-path performance warning: Pixel transfer is synchronized with 3D rendering.
+    if (id == 131218) return; // Program/shader state performance warning: Vertex shader in program 3 is being recompiled based on GL state.
+
+    std::cout << std::format("Debug message: source={} type={} id={} sev={} len={} msg={}", source, type, id, severity, length, message) << std::endl;
+}
+
 int main() {
     if (!glfwInit()) {
         std::cout << "Failed to initialize GLFW" << std::endl;
@@ -54,6 +69,8 @@ int main() {
     glfwSetCursorEnterCallback(window, &mouseEnteredCallback);
     glfwSetScrollCallback(window, &scrollCallback);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(debugCallback, nullptr);
 
     const GLubyte* version = glGetString(GL_VERSION);
     std::cout << "OpenGL version: " << version << std::endl;
