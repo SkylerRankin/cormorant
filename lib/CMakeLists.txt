@@ -38,6 +38,24 @@ if(NOT glad_POPULATED)
     add_subdirectory(${glad_SOURCE_DIR} ${glad_BINARY_DIR})
 endif()
 
+# ------ FreeType ---------------------------------------------------
+
+FetchContent_Declare(
+    freetype
+    GIT_REPOSITORY  https://github.com/freetype/freetype.git
+    GIT_TAG         VER-2-13-3
+    GIT_SHALLOW     TRUE
+    GIT_PROGRESS    TRUE
+)
+message("Fetching freetype")
+# Disable dependencies for unneeded features
+set(FT_DISABLE_ZLIB TRUE)
+set(FT_DISABLE_BZIP2 TRUE)
+set(FT_DISABLE_PNG TRUE)
+set(FT_DISABLE_HARFBUZZ TRUE)
+set(FT_DISABLE_BROTLI TRUE)
+FetchContent_MakeAvailable(freetype)
+
 # ------ ImGui ------------------------------------------------------
 
 FetchContent_Declare(
@@ -60,15 +78,19 @@ if(NOT imgui_POPULATED)
         ${imgui_SOURCE_DIR}/imgui_draw.cpp
         ${imgui_SOURCE_DIR}/imgui_widgets.cpp
         ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/misc/freetype/imgui_freetype.cpp
         ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
         ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp)
 
     target_include_directories(imgui PUBLIC
         ${imgui_SOURCE_DIR}
         ${imgui_SOURCE_DIR}/backends
+        ${imgui_SOURCE_DIR}/misc/freetype
         ${glfw_SOURCE_DIR}/include)
 
-    target_link_libraries(imgui PRIVATE glfw)
+    target_link_libraries(imgui PRIVATE glfw freetype)
+    target_compile_definitions(imgui PRIVATE IMGUI_USER_CONFIG="${PROJECT_SOURCE_DIR}/src/include/imguiConfig.h")
+
 endif ()
 
 # ------ tinyfiledialogs --------------------------------------------

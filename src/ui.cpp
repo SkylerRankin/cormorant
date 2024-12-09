@@ -10,6 +10,7 @@
 #include "imageView.h"
 #include "styles.h"
 #include "ui.h"
+#include "res/fontOpenSans.h"
 
 namespace {
 	enum ViewMode {
@@ -48,6 +49,7 @@ UI::UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* im
 	: window(window), imageTargetSize(glm::ivec2(1, 1)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
 	IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -62,6 +64,8 @@ UI::UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* im
 
 	imageViewer[0] = new ImageViewer(imageCache->getImages());
 	imageViewer[1] = new ImageViewer(imageCache->getImages());
+
+	io.Fonts->AddFontFromMemoryCompressedBase85TTF(OpenSans_compressed_data_base85, 16);
 }
 
 UI::~UI() {
@@ -578,8 +582,7 @@ void UI::renderControlPanelFiles() {
 			}
 
 			ImGui::Separator();
-			ImGui::Text(bytesToSizeString(image->filesize).c_str());
-			ImGui::Text("%d x %d", image->size.x, image->size.y);
+			ImGui::Text("%s, %d x %d", bytesToSizeString(image->filesize).c_str(), image->size.x, image->size.y);
 
 			if (image->metadata.timestamp.has_value()) {
 				ImageTimestamp t = image->metadata.timestamp.value();
@@ -775,7 +778,7 @@ void UI::renderCompareImageView() {
 }
 
 void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
-	const ImVec2 buttonSize(75, 20);
+	const ImVec2 buttonSize(75, 25);
 	const int buttonSpacing = 10;
 	const int buttonCount = 3;
 

@@ -15,7 +15,9 @@ set(CXX_HEADERS
     include/glCommon.h
     include/imageView.h
     include/styles.h
+    include/imguiConfig.h
     include/ui.h
+    res/fontOpenSans.h
 )
 set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
 
