@@ -21,11 +21,6 @@ static void mousePositionCallback(GLFWwindow* window, double x, double y) {
     app->onMouseMove(x, y);
 }
 
-static void mouseEnteredCallback(GLFWwindow* window, int entered) {
-    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    app->onMouseEntered(entered);
-}
-
 static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
     Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
     app->onScroll((int) yOffset);
@@ -66,7 +61,6 @@ int main() {
     glfwSetKeyCallback(window, &keyCallback);
     glfwSetMouseButtonCallback(window, &clickCallback);
     glfwSetCursorPosCallback(window, &mousePositionCallback);
-    glfwSetCursorEnterCallback(window, &mouseEnteredCallback);
     glfwSetScrollCallback(window, &scrollCallback);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
     glEnable(GL_DEBUG_OUTPUT);

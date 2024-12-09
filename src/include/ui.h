@@ -2,6 +2,7 @@
 #include <array>
 #include <functional>
 #include <glm/glm.hpp>
+#include "imageView.h"
 #include "glCommon.h"
 #include "group.h"
 #include "cache.h"
@@ -13,20 +14,12 @@ enum ControlPanelState {
     ControlPanel_ShowFiles = 3
 };
 
-enum ViewMode {
-    ViewMode_Single = 0,
-    ViewMode_ManualCompare = 1,
-    ViewMode_AutoCompare = 2
-};
-
 class UI {
 public:
-    UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
+    UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
     ~UI();
     void renderFrame();
     int getCurrentGroupIndex() const;
-    glm::ivec2 getImageTargetSize() const;
-    glm::ivec2 getImageTargetPosition(int imageView = 0) const;
     void setControlPanelState(ControlPanelState newState);
 
     // For all relevant image views, update the selected image to the next unskipped image that is not
@@ -41,28 +34,29 @@ public:
     void setShowPreviewProgress(bool enabled);
     void setPreviewProgress(float progress);
 
+    // Input handling
+    void inputClick(int button, int action, int mods);
+    void inputMouseMove(double x, double y);
+    void inputScroll(int offset);
+
     // Callbacks
     std::function<void(std::string)> onDirectoryOpened;
     std::function<void(int)> onGroupSelected;
-    std::function<void(int, int)> onImageSelected;
-    std::function<void(int, int)> onCompareImagesSelected;
+    std::function<void(int)> onImageSelected;
     std::function<void()> onRegenerateGroups;
-    std::function<void(int)> onViewModeUpdated;
     std::function<void(int)> onSkipImage;
     std::function<void(int)> onSaveImage;
-    std::function<void(bool)> onMovementLock;
-    std::function<void(int)> onResetImageTransform;
 
 private:
     const glm::ivec2 previewImageSize{75, 75};
-
-    std::array<GLuint, 2> imageViewTextures;
     const std::vector<ImageGroup>& groups;
+
+    GLFWwindow* window;
+    ImageViewer* imageViewer[2];
     GroupParameters& groupParameters;
     ImageCache* imageCache;
     glm::ivec2 imageTargetSize;
     std::array<glm::ivec2, 2> imageTargetPositions;
-    ViewMode viewMode = ViewMode_Single;
     bool showPreviewProgress = false;
     float previewProgress = 0.0f;
 
@@ -71,15 +65,6 @@ private:
     int selectedGroup;
     // IDs of the images, index 0 for the left and single image, and index 1 for the right image.
     std::array<int, 2> selectedImages = {-1, -1};
-    bool hideSkippedImages = true;
-
-    // Variables for deferred updates that must happena after frame is rendered
-    // TODO: should these be moved into the cpp file
-    bool openDirectoryPicker = false;
-    bool updateViewMode = false;
-    int newViewMode = -1;
-    bool scrollToSelectedFile = false;
-    bool scrollToTopOfFiles = false;
 
     void renderControlPanelGroups();
     void renderControlPanelFiles();
@@ -87,5 +72,7 @@ private:
     void renderCompareImageView();
     void renderImageViewOverlay(int imageView, glm::vec2 position);
     void renderPreviewProgress();
+    void selectImage(int imageView, int id);
     std::string bytesToSizeString(int bytes);
+    bool mouseOverlappingImage(int imageView);
 };

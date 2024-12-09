@@ -6,11 +6,44 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <tinyfiledialogs.h>
+#include "imageView.h"
 #include "styles.h"
 #include "ui.h"
 
-UI::UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
-	: imageViewTextures(textureIDs), imageTargetSize(glm::ivec2(0, 0)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
+namespace {
+	enum ViewMode {
+		ViewMode_Single = 0,
+		ViewMode_ManualCompare = 1,
+		ViewMode_AutoCompare = 2
+	};
+
+	struct InputState {
+		bool leftClickDown = false;
+		bool panningImage = false;
+		int mouseActiveImage = -1;
+		glm::ivec2 prevMousePosition{};
+		glm::ivec2 leftClickStart{};
+	};
+
+	struct UIState {
+		ViewMode viewMode = ViewMode_Single;
+		bool imageViewMovementLocked = true;
+		bool hideSkippedImages = true;
+
+		// Data used to defer UI updates until after frame is rendered
+		bool openDirectoryPicker = false;
+		bool updateViewMode = false;
+		int newViewMode = -1;
+		bool scrollToSelectedFile = false;
+		bool scrollToTopOfFiles = false;
+	};
+
+	InputState inputState;
+	UIState uiState;
+}
+
+UI::UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
+	: window(window), imageTargetSize(glm::ivec2(1, 1)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
 	IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -24,15 +57,84 @@ UI::UI(GLFWwindow* window, std::array<GLuint, 2> textureIDs, const std::vector<I
 	io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
 
 	setGlobalStyles();
+
+	imageViewer[0] = new ImageViewer(imageCache->getImages());
+	imageViewer[1] = new ImageViewer(imageCache->getImages());
 }
 
 UI::~UI() {
+	delete imageViewer[0];
+	delete imageViewer[1];
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 }
 
+void UI::inputClick(int button, int action, int mods) {
+	if (button == GLFW_MOUSE_BUTTON_LEFT) {
+		if (action == GLFW_PRESS) {
+			inputState.leftClickDown = true;
+			double mouseX, mouseY;
+			glfwGetCursorPos(window, &mouseX, &mouseY);
+			inputState.leftClickStart = glm::ivec2(mouseX, mouseY);
+			inputState.prevMousePosition = glm::ivec2(mouseX, mouseY);
+
+			bool overlaps[2] = {
+				mouseOverlappingImage(0),
+				mouseOverlappingImage(1)
+			};
+
+			inputState.panningImage = overlaps[0] || overlaps[1];
+			if (overlaps[0]) {
+				inputState.mouseActiveImage = 0;
+			} else if (overlaps[1]) {
+				inputState.mouseActiveImage = 1;
+			} else {
+				inputState.mouseActiveImage = -1;
+			}
+		} else if (action == GLFW_RELEASE) {
+			inputState.leftClickDown = false;
+			inputState.panningImage = false;
+			inputState.mouseActiveImage = -1;
+		}
+	}
+}
+
+void UI::inputMouseMove(double x, double y) {
+	if (inputState.leftClickDown) {
+		glm::ivec2 dragOffset = glm::ivec2(x, y) - inputState.prevMousePosition;
+		if (inputState.panningImage) {
+			if (uiState.imageViewMovementLocked) {
+				imageViewer[0]->pan(dragOffset);
+				imageViewer[1]->pan(dragOffset);
+			} else {
+				imageViewer[inputState.mouseActiveImage]->pan(dragOffset);
+			}
+		}
+	}
+	inputState.prevMousePosition = glm::ivec2(x, y);
+}
+
+void UI::inputScroll(int offset) {
+	if (mouseOverlappingImage(0)) {
+		imageViewer[0]->zoom(offset, inputState.prevMousePosition - imageTargetPositions[0]);
+		if (uiState.imageViewMovementLocked) {
+			imageViewer[1]->zoom(offset, inputState.prevMousePosition - imageTargetPositions[0]);
+		}
+	} else if (mouseOverlappingImage(1)) {
+		imageViewer[1]->zoom(offset, inputState.prevMousePosition - imageTargetPositions[1]);
+		if (uiState.imageViewMovementLocked) {
+			imageViewer[0]->zoom(offset, inputState.prevMousePosition - imageTargetPositions[1]);
+		}
+	}
+}
+
 void UI::renderFrame() {
+	imageViewer[0]->renderFrame(imageTargetSize);
+	if (uiState.viewMode != ViewMode_Single) {
+		imageViewer[1]->renderFrame(imageTargetSize);
+	}
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -40,7 +142,7 @@ void UI::renderFrame() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem("Open")) {
-				openDirectoryPicker = true;
+				uiState.openDirectoryPicker = true;
 			}
 			ImGui::MenuItem("Save");
             ImGui::MenuItem("Settings");
@@ -124,38 +226,43 @@ void UI::renderFrame() {
 
 	ImGui::End();
 
-	if (viewMode == ViewMode_Single) {
+	if (uiState.viewMode == ViewMode_Single) {
 		renderSingleImageView();
-	} else if (viewMode == ViewMode_ManualCompare) {
+	} else if (uiState.viewMode == ViewMode_ManualCompare) {
 		renderCompareImageView();
-	} else if (viewMode == ViewMode_AutoCompare) {
+	} else if (uiState.viewMode == ViewMode_AutoCompare) {
 		renderCompareImageView();
 	}
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-	if (openDirectoryPicker) {
-		openDirectoryPicker = false;
+	if (uiState.openDirectoryPicker) {
+		uiState.openDirectoryPicker = false;
 		char const* result = tinyfd_selectFolderDialog("Image directory", nullptr);
 		if (result != nullptr) {
 			onDirectoryOpened(result);
 		}
 	}
 
-	if (updateViewMode) {
-		viewMode = static_cast<ViewMode>(newViewMode);
+	if (uiState.updateViewMode) {
+		uiState.viewMode = static_cast<ViewMode>(uiState.newViewMode);
 		selectedImages.fill(-1);
-		onViewModeUpdated(newViewMode);
-		updateViewMode = false;
-		newViewMode = -1;
+		uiState.updateViewMode = false;
+		uiState.newViewMode = -1;
+
+		// Clear out both image views
+		imageViewer[0]->setImage(-1);
+		imageViewer[1]->setImage(-1);
+		imageViewer[0]->resetTransform();
+		imageViewer[1]->resetTransform();
 	}
 
 	// UI updates when leaving a control panel state
 	if (prevControlPanelState != controlPanelState) {
 		switch (prevControlPanelState) {
 		case ControlPanel_ShowFiles:
-			scrollToTopOfFiles = true;
+			uiState.scrollToTopOfFiles = true;
 			break;
 		case ControlPanel_ShowGroups:
 			break;
@@ -314,8 +421,8 @@ void UI::renderControlPanelGroups() {
 			onGroupSelected(selectedGroup);
 			controlPanelState = ControlPanel_ShowFiles;
 			selectedImages.fill(-1);
-			onImageSelected(0, -1);
-			onImageSelected(1, -1);
+			selectImage(0, -1);
+			selectImage(1, -1);
 		}
 	}
 
@@ -346,12 +453,12 @@ void UI::renderControlPanelFiles() {
 
 		const char* viewingModes[] = { "Single Image", "Manual Compare", "Auto Compare" };
 
-		if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int)viewMode], 0)) {
+		if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int)uiState.viewMode], 0)) {
 			for (int i = 0; i < 3; i++) {
-				const bool selected = i == static_cast<int>(viewMode);
+				const bool selected = i == static_cast<int>(uiState.viewMode);
 				if (ImGui::Selectable(viewingModes[i], selected)) {
-					updateViewMode = true;
-					newViewMode = i;
+					uiState.updateViewMode = true;
+					uiState.newViewMode = i;
 				}
 
 				if (selected) {
@@ -367,18 +474,20 @@ void UI::renderControlPanelFiles() {
 		ImGui::PopStyleColor();
 		ImGui::SetItemTooltip("info about viewing modes");
 
-		ImGui::Checkbox("Hide skipped images", &hideSkippedImages);
+		ImGui::Checkbox("Hide skipped images", &uiState.hideSkippedImages);
 
-		if (viewMode == ViewMode_Single) {
+		if (uiState.viewMode == ViewMode_Single) {
 			ImGui::BeginDisabled();
 		}
 
 		static bool movementLocked = true;
 		if (ImGui::Checkbox("Lock movement", &movementLocked)) {
-			onMovementLock(movementLocked);
+			uiState.imageViewMovementLocked = movementLocked;
+			imageViewer[0]->resetTransform();
+			imageViewer[1]->resetTransform();
 		}
 
-		if (viewMode == ViewMode_Single) {
+		if (uiState.viewMode == ViewMode_Single) {
 			ImGui::EndDisabled();
 		}
 
@@ -402,16 +511,16 @@ void UI::renderControlPanelFiles() {
 	static int hoveredChildIndex = -1;
 	bool anyChildHovered = false;
 
-	if (scrollToTopOfFiles) {
+	if (uiState.scrollToTopOfFiles) {
 		ImGui::SetNextWindowScroll(ImVec2(0, 0));
-		scrollToTopOfFiles = false;
+		uiState.scrollToTopOfFiles = false;
 	}
 
 	ImGui::BeginChild("files_scroll_window", ImVec2(-1, -1), 0, 0);
 	for (int imageID : groups[selectedGroup].ids) {
 		const Image* image = imageCache->getImage(imageID);
 
-		if (image->skipped && hideSkippedImages) continue;
+		if (image->skipped && uiState.hideSkippedImages) continue;
 
 		if (imageID == selectedImages[0] || imageID == selectedImages[1]) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 255));
@@ -436,9 +545,9 @@ void UI::renderControlPanelFiles() {
 				ImGui::PushStyleColor(ImGuiCol_Text, Colors::textDisabled);
 			}
 
-			if (viewMode == ViewMode_ManualCompare && selectedImages[0] == imageID) {
+			if (uiState.viewMode == ViewMode_ManualCompare && selectedImages[0] == imageID) {
 				ImGui::Text(std::format("{} - Left", image->filename).c_str());
-			} else if (viewMode == ViewMode_ManualCompare && selectedImages[1] == imageID) {
+			} else if (uiState.viewMode == ViewMode_ManualCompare && selectedImages[1] == imageID) {
 				ImGui::Text(std::format("{} - Right", image->filename).c_str());
 			} else {
 				ImGui::Text(image->filename.c_str());
@@ -463,16 +572,16 @@ void UI::renderControlPanelFiles() {
 				ImGui::PopStyleColor();
 			}
 			
-			if (imageID == hoveredChildIndex && viewMode == ViewMode_ManualCompare) {
+			if (imageID == hoveredChildIndex && uiState.viewMode == ViewMode_ManualCompare) {
 				ImGui::TableSetColumnIndex(2);
 				if (ImGui::Button("Left", ImVec2(50, 20))) {
 					selectedImages[0] = imageID;
-					onImageSelected(0, selectedImages[0]);
+					selectImage(0, selectedImages[0]);
 				}
 
 				if (ImGui::Button("Right", ImVec2(50, 20))) {
 					selectedImages[1] = imageID;
-					onImageSelected(1, selectedImages[1]);
+					selectImage(1, selectedImages[1]);
 				}
 			}
 
@@ -481,8 +590,8 @@ void UI::renderControlPanelFiles() {
 
 		ImGui::EndChild();
 
-		if (scrollToSelectedFile && imageID == selectedImages[0]) {
-			scrollToSelectedFile = false;
+		if (uiState.scrollToSelectedFile && imageID == selectedImages[0]) {
+			uiState.scrollToSelectedFile = false;
 			ImGui::ScrollToItem();
 		}
 
@@ -496,9 +605,9 @@ void UI::renderControlPanelFiles() {
 			anyChildHovered = true;
 		}
 
-		if (ImGui::IsItemClicked() && viewMode == ViewMode_Single) {
+		if (ImGui::IsItemClicked() && uiState.viewMode == ViewMode_Single) {
 			selectedImages[0] = imageID;
-			onImageSelected(0, selectedImages[0]);
+			selectImage(0, selectedImages[0]);
 		}
 	}
 
@@ -518,7 +627,7 @@ void UI::renderSingleImageView() {
 	imageTargetPositions[0].x = (int)ImGui::GetWindowPos().x;
 	imageTargetPositions[0].y = (int)ImGui::GetWindowPos().y;
 
-	ImGui::Image(imageViewTextures[0], ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
+	ImGui::Image(imageViewer[0]->getTextureId(), ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 
 	bool showControls =
 		controlPanelState == ControlPanel_ShowFiles &&
@@ -553,9 +662,9 @@ void UI::renderCompareImageView() {
 	ImVec2 halfSize = ImVec2(ImGui::GetContentRegionAvail().x / 2.0f, ImGui::GetContentRegionAvail().y);
 
 	ImGui::PushStyleVarX(ImGuiStyleVar_ItemSpacing, 0);
-	ImGui::Image(imageViewTextures[0], halfSize, ImVec2(0, 1), ImVec2(1, 0));
+	ImGui::Image(imageViewer[0]->getTextureId(), halfSize, ImVec2(0, 1), ImVec2(1, 0));
 	ImGui::SameLine();
-	ImGui::Image(imageViewTextures[1], halfSize, ImVec2(0, 1), ImVec2(1, 0));
+	ImGui::Image(imageViewer[1]->getTextureId(), halfSize, ImVec2(0, 1), ImVec2(1, 0));
 	ImGui::PopStyleVar();
 
 	// Render the overlay only for the image view overlapping the cursor
@@ -628,7 +737,12 @@ void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 
 	ImGui::SameLine();
 	if (ImGui::Button("Reset", buttonSize)) {
-		onResetImageTransform(imageView);
+		if (uiState.imageViewMovementLocked) {
+			imageViewer[0]->resetTransform();
+			imageViewer[1]->resetTransform();
+		} else {
+			imageViewer[imageView]->resetTransform();
+		}
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 
@@ -652,6 +766,14 @@ void UI::renderPreviewProgress() {
 	ImGui::Spacing();
 }
 
+void UI::selectImage(int imageView, int id) {
+	onImageSelected(id);
+	imageViewer[imageView]->setImage(id);
+	if (uiState.viewMode == ViewMode_Single) {
+		imageViewer[imageView]->resetTransform();
+	}
+}
+
 std::string UI::bytesToSizeString(int bytes) {
 	if (bytes < 1024) {
 		return std::format("{} bytes", bytes);
@@ -666,23 +788,15 @@ int UI::getCurrentGroupIndex() const {
 	return selectedGroup;
 }
 
-glm::ivec2 UI::getImageTargetSize() const {
-	return imageTargetSize;
-}
-
-glm::ivec2 UI::getImageTargetPosition(int imageView) const {
-	return imageTargetPositions[imageView];
-}
-
 void UI::setControlPanelState(ControlPanelState newState) {
 	controlPanelState = newState;
 }
 
 void UI::goToNextUnskippedImage() {
-	if (viewMode != ViewMode_Single) return;
+	if (uiState.viewMode != ViewMode_Single) return;
 
 	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
-		if (imageView > 0 && viewMode == ViewMode_Single) break;
+		if (imageView > 0 && uiState.viewMode == ViewMode_Single) break;
 
 		// Find index of selected image within the group
 		int index = -1;
@@ -701,8 +815,8 @@ void UI::goToNextUnskippedImage() {
 			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
-				onImageSelected(imageView, newImage);
-				scrollToSelectedFile = true;
+				selectImage(imageView, newImage);
+				uiState.scrollToSelectedFile = true;
 				break;
 			}
 		}
@@ -710,10 +824,10 @@ void UI::goToNextUnskippedImage() {
 }
 
 void UI::goToPreviousUnskippedImage() {
-	if (viewMode != ViewMode_Single) return;
+	if (uiState.viewMode != ViewMode_Single) return;
 
 	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
-		if (imageView > 0 && viewMode == ViewMode_Single) break;
+		if (imageView > 0 && uiState.viewMode == ViewMode_Single) break;
 
 		// Find index of selected image within the group
 		int index = -1;
@@ -732,8 +846,8 @@ void UI::goToPreviousUnskippedImage() {
 			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
 			if (!imageCache->getImage(newImage)->skipped) {
 				selectedImages[imageView] = newImage;
-				onImageSelected(imageView, newImage);
-				scrollToSelectedFile = true;
+				selectImage(imageView, newImage);
+				uiState.scrollToSelectedFile = true;
 				break;
 			}
 		}
@@ -742,7 +856,7 @@ void UI::goToPreviousUnskippedImage() {
 
 void UI::skippedImage() {
 	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
-		if (imageView > 0 && viewMode == ViewMode_Single) break;
+		if (imageView > 0 && uiState.viewMode == ViewMode_Single) break;
 
 		// The image for this view isn't skipped, so no update required
 		if (!imageCache->getImage(selectedImages[imageView])->skipped) continue;
@@ -763,7 +877,7 @@ void UI::skippedImage() {
 			int newImage = groups[selectedGroup].ids[i];
 			if (!imageCache->getImage(newImage)->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
 				selectedImages[imageView] = newImage;
-				onImageSelected(imageView, newImage);
+				selectImage(imageView, newImage);
 				return;
 			}
 		}
@@ -773,7 +887,7 @@ void UI::skippedImage() {
 			int newImage = groups[selectedGroup].ids[i];
 			if (!imageCache->getImage(groups[selectedGroup].ids[i])->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
 				selectedImages[imageView] = newImage;
-				onImageSelected(imageView, newImage);
+				selectImage(imageView, newImage);
 				return;
 			}
 		}
@@ -781,7 +895,7 @@ void UI::skippedImage() {
 		// No available images
 		int newImage = -1;
 		selectedImages[imageView] = newImage;
-		onImageSelected(imageView, newImage);
+		selectImage(imageView, newImage);
 	}
 }
 
@@ -791,4 +905,20 @@ void UI::setShowPreviewProgress(bool enabled) {
 
 void UI::setPreviewProgress(float progress) {
 	previewProgress = progress;
+}
+
+bool UI::mouseOverlappingImage(int imageView) {
+	// Prevent second image viewer from being interactable in single image mode.
+	if (imageView == 1 && uiState.viewMode == ViewMode_Single) {
+		return false;
+	}
+
+	glm::ivec2 imagePosition = imageTargetPositions[imageView];
+	glm::ivec2 imageSize = imageTargetSize;
+
+	double mouseX, mouseY;
+	glfwGetCursorPos(window, &mouseX, &mouseY);
+
+	return imagePosition.x <= mouseX && mouseX <= imagePosition.x + imageSize.x &&
+		   imagePosition.y <= mouseY && mouseY <= imagePosition.y + imageSize.y;
 }

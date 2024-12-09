@@ -4,8 +4,8 @@
 #include "imageView.h"
 
 ImageViewer::ImageViewer(const std::map<int, Image>& images) : images(images) {
-	// Setup quad for single images
-	float singleQuad[] = {
+	// Setup quad
+	float quad[] = {
 		// First triangle
 		1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
 		1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
@@ -22,7 +22,7 @@ ImageViewer::ImageViewer(const std::map<int, Image>& images) : images(images) {
 
 	glBindVertexArray(singleImageRect.vao);
 	glBindBuffer(GL_ARRAY_BUFFER, singleImageRect.vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(singleQuad), singleQuad, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
 
 	int stride = 5;
 	int positionIndex = 0;
@@ -39,7 +39,12 @@ ImageViewer::ImageViewer(const std::map<int, Image>& images) : images(images) {
 	buildShaders();
 }
 
-void ImageViewer::renderFrame() {
+void ImageViewer::renderFrame(glm::ivec2 targetSize) {
+	// The space available in UI to render image may have changed since last frame.
+	// If so, the aspect ratio transform needs to be updated as well as the frame
+	// buffer dimensions.
+	updateTargetSize(targetSize);
+
 	frameBuffer.bind();
 
 	glViewport(0, 0, imageTargetSize.x, imageTargetSize.y);
@@ -47,7 +52,7 @@ void ImageViewer::renderFrame() {
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	glUseProgram(shaderProgram);
-	renderSingleImage();
+	renderImage();
 
 	frameBuffer.unbind();
 }
@@ -117,7 +122,7 @@ void ImageViewer::setImage(int id) {
 	updateBaseImageTransform();
 }
 
-GLint ImageViewer::getTextureId() {
+GLuint ImageViewer::getTextureId() {
 	return frameBuffer.getTextureId();
 }
 
@@ -202,7 +207,7 @@ void ImageViewer::buildShaders() {
 	glDeleteShader(fragmentShader);
 }
 
-void ImageViewer::renderSingleImage() {
+void ImageViewer::renderImage() {
 	// TODO: when image is not available, maybe render some other loading image instead of nothing?
 	if (imageID == -1 || !images.at(imageID).imageLoaded) {
 		return;

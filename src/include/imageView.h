@@ -15,12 +15,12 @@ struct RectObject {
 class ImageViewer {
 public:
 	ImageViewer(const std::map<int, Image>&);
-	void renderFrame();
+	void renderFrame(glm::ivec2 targetSize);
 	void updateTargetSize(glm::ivec2 newSize);
 	void zoom(int amount, glm::ivec2 position);
 	void pan(glm::ivec2 offset);
 	void setImage(int id);
-	GLint getTextureId();
+	GLuint getTextureId();
 	void resetTransform();
 
 private:
@@ -40,7 +40,7 @@ private:
 	RectObject singleImageRect;
 
 	void buildShaders();
-	void renderSingleImage();
+	void renderImage();
 	void updateBaseImageTransform();
 	void updatePanZoomTransform();
 	float getZoomFactor(float zoom);
