@@ -13,12 +13,6 @@
 #include "res/fontOpenSans.h"
 
 namespace {
-	enum ViewMode {
-		ViewMode_Single = 0,
-		ViewMode_ManualCompare = 1,
-		ViewMode_AutoCompare = 2
-	};
-
 	struct InputState {
 		bool leftClickDown = false;
 		bool panningImage = false;
@@ -43,6 +37,8 @@ namespace {
 
 	InputState inputState;
 	UIState uiState;
+
+	std::string bytesToSizeString(int bytes);
 }
 
 UI::UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
@@ -141,21 +137,23 @@ void UI::renderFrame() {
 		imageViewer[1]->renderFrame(imageTargetSize);
 	}
 
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
 
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
+	float menuBarHeight;
+
+	if (ImGui::BeginMainMenuBar()) {
+		if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem("Open")) {
 				uiState.openDirectoryPicker = true;
 			}
 			ImGui::MenuItem("Save");
-            ImGui::MenuItem("Settings");
+			ImGui::MenuItem("Settings");
 			ImGui::Separator();
-            ImGui::MenuItem("Exit");
-            ImGui::EndMenu();
-        }
+			ImGui::MenuItem("Exit");
+			ImGui::EndMenu();
+		}
 		if (ImGui::BeginMenu("Export")) {
 			if (imageCache->getImages().size() == 0) {
 				ImGui::BeginDisabled();
@@ -175,79 +173,67 @@ void UI::renderFrame() {
 			ImGui::MenuItem("About");
 			ImGui::EndMenu();
 		}
-    }
-    ImGui::EndMainMenuBar();
-
-	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->Pos);
-	ImGui::SetNextWindowSize(viewport->Size);
-	ImGui::SetNextWindowViewport(viewport->ID);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-
-	ImGuiWindowFlags window_flags =
-		ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar |
-		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus |
-		ImGuiWindowFlags_NoNavFocus;
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-	ImGui::Begin("dockspace_window", nullptr, window_flags);
-	ImGui::PopStyleVar();
-
-	ImGui::PopStyleVar();
-
-	if (ImGui::DockBuilderGetNode(ImGui::GetID("dockspace")) == nullptr) {
-		// Clear any existing dockspace layout and add an empty node that will hold the image viewport
-		ImGuiID dockspaceID = ImGui::GetID("dockspace");
-		ImGuiViewport* viewport = ImGui::GetMainViewport();
-		ImGui::DockBuilderRemoveNode(dockspaceID);
-		ImGui::DockBuilderAddNode(dockspaceID);
-
-		// Split into two dock nodes, the main viewporrt and the left panel
-		ImGuiID dockRightID = dockspaceID;
-		ImGuiID dockLeftID = ImGui::DockBuilderSplitNode(dockRightID, ImGuiDir_Left, 0.25f, nullptr, &dockRightID);
-
-		// Remove the tab bar / title from each window
-		ImGui::DockBuilderGetNode(dockRightID)->LocalFlags |= ImGuiDockNodeFlags_NoTabBar;
-		ImGui::DockBuilderGetNode(dockLeftID)->LocalFlags |= ImGuiDockNodeFlags_NoTabBar;
-
-		ImGui::DockBuilderDockWindow("left_panel", dockLeftID);
-		ImGui::DockBuilderDockWindow("right_panel", dockRightID);
-		ImGui::DockBuilderFinish(dockspaceID);
 	}
+	menuBarHeight = ImGui::GetFrameHeight();
+	ImGui::EndMainMenuBar();
 
-	ImGuiID dockspaceID = ImGui::GetID("dockspace");
-	ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f));
-	ImGui::End();
+	ImVec2 windowSize(
+		ImGui::GetMainViewport()->Size.x,
+		ImGui::GetMainViewport()->Size.y - menuBarHeight
+	);
+
+	ImGui::SetNextWindowPos(ImVec2(0, menuBarHeight));
+	ImGui::SetNextWindowSize(windowSize);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+	ImGui::Begin("main window", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+
+	ImGui::SetNextWindowPos(ImVec2(0.0f, menuBarHeight));
+	ImGui::BeginChild("left panel", ImVec2(controlWidth[uiState.viewMode], windowSize.y));
 
 	prevControlPanelState = controlPanelState;
-	ImGui::Begin("left_panel", nullptr);
-
 	switch (controlPanelState) {
 	case ControlPanel_NothingLoaded:
+		beginControlPanelSection("nothing_loaded");
 		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
 		ImGui::TextWrapped("To open an image directory, use File > Open.");
 		ImGui::PopStyleColor();
+		endSection();
 		break;
 	case ControlPanel_DirectoryLoading:
+		beginControlPanelSection("directory_loaded");
 		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
 		ImGui::TextWrapped("Searching for images in directory...");
 		ImGui::PopStyleColor();
+		endSection();
 		break;
 	case ControlPanel_ShowGroups:
-		renderControlPanelGroups();
+		renderControlPanelGroupOptions();
+		ImGui::Spacing();
+		renderControlPanelGroupsList();
 		break;
 	case ControlPanel_ShowFiles:
 		renderControlPanelFiles();
 		break;
 	case ControlPanel_SaveFilenames:
+		beginControlPanelSection("save_filenames");
 		renderControlPanelSaveFilenames();
+		endSection();
 		break;
 	case ControlPanel_SaveImages:
+		beginControlPanelSection("save_images");
 		renderControlPanelSaveImages();
+		endSection();
 		break;
 	}
 
-	ImGui::End();
+	ImGui::EndChild();
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::SetNextWindowPos(ImVec2(controlWidth[uiState.viewMode], menuBarHeight));
+	ImGui::BeginChild("image_view_window", ImVec2(windowSize.x - controlWidth[uiState.viewMode], windowSize.y));
 
 	if (uiState.viewMode == ViewMode_Single) {
 		renderSingleImageView();
@@ -257,8 +243,14 @@ void UI::renderFrame() {
 		renderCompareImageView();
 	}
 
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	ImGui::EndChild();
+	ImGui::PopStyleVar();
+
+	ImGui::End();
+	ImGui::PopStyleVar(2);
+
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	if (uiState.openDirectoryPicker) {
 		uiState.openDirectoryPicker = false;
@@ -294,7 +286,9 @@ void UI::renderFrame() {
 	}
 }
 
-void UI::renderControlPanelGroups() {
+void UI::renderControlPanelGroupOptions() {
+	beginSection("group_parameter_padding_window", controlPadding, controlWidth[uiState.viewMode]);
+
 	ImVec2 previousWindowPadding = ImGui::GetStyle().WindowPadding;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::BeginChild("group_parameter_window", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
@@ -389,21 +383,31 @@ void UI::renderControlPanelGroups() {
 		ImGui::TextWrapped("%d group%s with no saved images", countGroupsWithNoSaves, countGroupsWithNoSaves == 1 ? "" : "s");
 		ImGui::PopStyleColor();
 	}
+	
+	endSection();
+}
 
-	ImGui::Spacing();
-
+void UI::renderControlPanelGroupsList() {
 	static int hoveredChildIndex = -1;
 	bool anyChildHovered = false;
 
 	ImGui::BeginChild("groups_scroll_window", ImVec2(-1, -1), 0, 0);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(controlPadding, controlPadding));
+	float groupItemWidth = ImGui::GetContentRegionAvail().x - controlPadding * 2;
+
 	for (int i = 0; i < groups.size(); i++) {
 		if (hoveredChildIndex == i) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
 		}
 
-		ImGui::BeginChild(std::format("group_child_{}", i).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+		ImGui::SetCursorPosX(controlPadding);
+		ImGui::BeginChild(std::format("group_child_{}", i).c_str(), ImVec2(groupItemWidth, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
 		if (ImGui::BeginTable(std::format("group_table_{}", i).c_str(), 2, ImGuiTableFlags_NoBordersInBody)) {
+			// Wrap the call to TableNextRow with zero cell padding to avoid the padding added on top of the row.
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {0, 0});
 			ImGui::TableNextRow();
+			ImGui::PopStyleVar();
+
 			ImGui::TableSetColumnIndex(0);
 
 			unsigned int textureId = imageCache->getImage(groups[i].ids[0])->previewTextureId;
@@ -426,6 +430,7 @@ void UI::renderControlPanelGroups() {
 			ImGui::EndTable();
 		}
 		ImGui::EndChild();
+		ImGui::Spacing();
 
 		if (hoveredChildIndex == i) {
 			ImGui::PopStyleColor();
@@ -450,6 +455,7 @@ void UI::renderControlPanelGroups() {
 		}
 	}
 
+	ImGui::PopStyleVar();
 	ImGui::EndChild();
 
 	if (!anyChildHovered) {
@@ -458,6 +464,8 @@ void UI::renderControlPanelGroups() {
 }
 
 void UI::renderControlPanelFiles() {
+	beginSection("files_options_padding_window", controlPadding, controlWidth[uiState.viewMode]);
+
 	if (ImGui::Button("Return to groups", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
 		controlPanelState = ControlPanel_ShowGroups;
 		selectedImages.fill(-1);
@@ -477,6 +485,7 @@ void UI::renderControlPanelFiles() {
 
 		const char* viewingModes[] = { "Single Image", "Manual Compare", "Auto Compare" };
 
+		ImGui::SetNextItemWidth(viewModeComboWidth);
 		if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int)uiState.viewMode], 0)) {
 			for (int i = 0; i < 3; i++) {
 				const bool selected = i == static_cast<int>(uiState.viewMode);
@@ -491,12 +500,6 @@ void UI::renderControlPanelFiles() {
 			}
 			ImGui::EndCombo();
 		}
-
-		ImGui::SameLine();
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(90, 90, 90, 255));
-		ImGui::Text("?");
-		ImGui::PopStyleColor();
-		ImGui::SetItemTooltip("info about viewing modes");
 
 		ImGui::Checkbox("Hide skipped images", &uiState.hideSkippedImages);
 
@@ -532,6 +535,8 @@ void UI::renderControlPanelFiles() {
 	ImGui::Text("%d saved, %d skipped", groups[selectedGroup].savedCount, groups[selectedGroup].skippedCount);
 	ImGui::Spacing();
 
+	endSection();
+
 	static int hoveredChildIndex = -1;
 	bool anyChildHovered = false;
 
@@ -540,7 +545,10 @@ void UI::renderControlPanelFiles() {
 		uiState.scrollToTopOfFiles = false;
 	}
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(controlPadding, controlPadding));
+
 	ImGui::BeginChild("files_scroll_window", ImVec2(-1, -1), 0, 0);
+	const float fileItemWidth = ImGui::GetContentRegionAvail().x - controlPadding * 2;
 	for (int imageID : groups[selectedGroup].ids) {
 		const Image* image = imageCache->getImage(imageID);
 
@@ -552,11 +560,16 @@ void UI::renderControlPanelFiles() {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
 		}
 
-		ImGui::BeginChild(std::format("file_child_{}", imageID).c_str(), ImVec2(-1.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+		ImGui::SetCursorPosX(controlPadding);
+		ImGui::BeginChild(std::format("file_child_{}", imageID).c_str(), ImVec2(fileItemWidth, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
 		if (ImGui::BeginTable(std::format("file_table_{}", imageID).c_str(), 3, ImGuiTableFlags_NoBordersInBody)) {
+			ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {0, 0});
 			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
+			ImGui::PopStyleVar();
 
+			const float rowWidth = ImGui::GetContentRegionAvail().x;
+
+			ImGui::TableSetColumnIndex(0);
 			// TODO: choose texture id based on image status. completed image is the preview texture,
 			//	loading image is some loading texture, failed is some error texture
 			ImGui::Image(image->previewTextureId, ImVec2(previewImageSize.x, previewImageSize.y), ImVec2(0, 1), ImVec2(1, 0));
@@ -569,13 +582,7 @@ void UI::renderControlPanelFiles() {
 				ImGui::PushStyleColor(ImGuiCol_Text, Colors::textDisabled);
 			}
 
-			if (uiState.viewMode == ViewMode_ManualCompare && selectedImages[0] == imageID) {
-				ImGui::Text(std::format("{} - Left", image->filename).c_str());
-			} else if (uiState.viewMode == ViewMode_ManualCompare && selectedImages[1] == imageID) {
-				ImGui::Text(std::format("{} - Right", image->filename).c_str());
-			} else {
-				ImGui::Text(image->filename.c_str());
-			}
+			ImGui::Text(image->filename.c_str());
 
 			if (image->saved) {
 				ImGui::PopStyleColor();
@@ -594,24 +601,43 @@ void UI::renderControlPanelFiles() {
 			if (image->skipped) {
 				ImGui::PopStyleColor();
 			}
-			
-			if (imageID == hoveredChildIndex && uiState.viewMode == ViewMode_ManualCompare) {
+
+			if (uiState.viewMode == ViewMode_ManualCompare && (imageID == hoveredChildIndex || imageID == selectedImages[0] || imageID == selectedImages[1])) {
+				const float xOffset = rowWidth - compareButtonSize.x * 2 - compareButtonSpacing;
+				const float yOffset = controlPadding + (previewImageSize.x / 2.0f) - (compareButtonSize.y / 2.0f);
+
 				ImGui::TableSetColumnIndex(2);
-				if (ImGui::Button("Left", ImVec2(50, 20))) {
+
+				ImGui::SetCursorPosX(xOffset);
+				ImGui::SetCursorPosY(yOffset);
+
+				const bool leftSelected = imageID == selectedImages[0];
+				const bool rightSelected = imageID == selectedImages[1];
+
+				if (leftSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
+				if (ImGui::Button("<", ImVec2(compareButtonSize.x, compareButtonSize.y))) {
 					selectedImages[0] = imageID;
 					selectImage(0, selectedImages[0]);
 				}
+				if (leftSelected) ImGui::PopStyleColor();
 
-				if (ImGui::Button("Right", ImVec2(50, 20))) {
+				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { compareButtonSpacing, 0});
+				ImGui::SameLine();
+				ImGui::PopStyleVar();
+
+				if (rightSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
+				if (ImGui::Button(">", ImVec2(compareButtonSize.x, compareButtonSize.y))) {
 					selectedImages[1] = imageID;
 					selectImage(1, selectedImages[1]);
 				}
+				if (rightSelected) ImGui::PopStyleColor();
 			}
 
 			ImGui::EndTable();
 		}
 
 		ImGui::EndChild();
+		ImGui::Spacing();
 
 		if (uiState.scrollToSelectedFile && imageID == selectedImages[0]) {
 			uiState.scrollToSelectedFile = false;
@@ -639,6 +665,7 @@ void UI::renderControlPanelFiles() {
 	}
 
 	ImGui::EndChild();
+	ImGui::PopStyleVar();
 }
 
 void UI::renderControlPanelSaveFilenames() {
@@ -659,12 +686,12 @@ void UI::renderControlPanelSaveFilenames() {
 		std::string outputPath = Export::filenameOutputPath(directoryPath).string();
 		ImGui::TextWrapped("File location: %s", outputPath.c_str());
 		ImGui::Spacing();
-		if (ImGui::Button("Save", ImVec2(100, 20))) {
+		if (ImGui::Button("Save", ImVec2(exportButtonSize.x, exportButtonSize.y))) {
 			Export::exportFilenames(directoryPath, imageCache->getImages());
 			uiState.exportInProgress = true;
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Cancel", ImVec2(100, 20))) {
+		if (ImGui::Button("Cancel", ImVec2(exportButtonSize.x, exportButtonSize.y))) {
 			controlPanelState = ControlPanel_ShowGroups;
 		}
 	}
@@ -688,21 +715,18 @@ void UI::renderControlPanelSaveImages() {
 
 		ImGui::TextWrapped("Copies all saved images into %s.", outputPath.c_str());
 		ImGui::Spacing();
-		if (ImGui::Button("Save", ImVec2(100, 20))) {
+		if (ImGui::Button("Save", ImVec2(exportButtonSize.x, exportButtonSize.y))) {
 			Export::exportImages(directoryPath, imageCache->getImages());
 			uiState.exportInProgress = true;
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Cancel", ImVec2(100, 20))) {
+		if (ImGui::Button("Cancel", ImVec2(exportButtonSize.x, exportButtonSize.y))) {
 			controlPanelState = ControlPanel_ShowGroups;
 		}
 	}
 }
 
 void UI::renderSingleImageView() {
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin("right_panel", nullptr);
-
 	imageTargetSize.x = (int)ImGui::GetContentRegionAvail().x;
 	imageTargetSize.y = (int)ImGui::GetContentRegionAvail().y;
 	imageTargetPositions[0].x = (int)ImGui::GetWindowPos().x;
@@ -724,15 +748,9 @@ void UI::renderSingleImageView() {
 
 		renderImageViewOverlay(0, position);
 	}
-
-	ImGui::End();
-	ImGui::PopStyleVar();
 }
 
 void UI::renderCompareImageView() {
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin("right_panel", nullptr);
-
 	imageTargetSize.x = (int)ImGui::GetContentRegionAvail().x / 2.0f;
 	imageTargetSize.y = (int)ImGui::GetContentRegionAvail().y;
 	imageTargetPositions[0].x = (int)ImGui::GetWindowPos().x;
@@ -772,9 +790,6 @@ void UI::renderCompareImageView() {
 		};
 		renderImageViewOverlay(1, position);
 	}
-
-	ImGui::End();
-	ImGui::PopStyleVar();
 }
 
 void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
@@ -855,7 +870,8 @@ void UI::selectImage(int imageView, int id) {
 	}
 }
 
-std::string UI::bytesToSizeString(int bytes) {
+namespace {
+std::string bytesToSizeString(int bytes) {
 	if (bytes < 1024) {
 		return std::format("{} bytes", bytes);
 	} else if (bytes < 1024 * 1024) {
@@ -863,6 +879,7 @@ std::string UI::bytesToSizeString(int bytes) {
 	} else {
 		return std::format("{} MB", floor(bytes / 1024 / 1024));
 	}
+}
 }
 
 int UI::getCurrentGroupIndex() const {
@@ -998,4 +1015,17 @@ bool UI::mouseOverlappingImage(int imageView) {
 
 	return imagePosition.x <= mouseX && mouseX <= imagePosition.x + imageSize.x &&
 		   imagePosition.y <= mouseY && mouseY <= imagePosition.y + imageSize.y;
+}
+
+void UI::beginControlPanelSection(const char* label) {
+	beginSection(label, controlPadding, controlWidth[uiState.viewMode]);
+}
+
+void UI::beginSection(const char* label, float padding, float outerWidth) {
+	ImGui::SetCursorPos(ImVec2(padding, padding));
+	ImGui::BeginChild(label, ImVec2(outerWidth - 2 * padding, 0), ImGuiChildFlags_AutoResizeY, 0);
+}
+
+void UI::endSection() {
+	ImGui::EndChild();
 }

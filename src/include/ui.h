@@ -17,6 +17,12 @@ enum ControlPanelState {
     ControlPanel_SaveImages = 5,
 };
 
+enum ViewMode {
+    ViewMode_Single = 0,
+    ViewMode_ManualCompare = 1,
+    ViewMode_AutoCompare = 2
+};
+
 class UI {
 public:
     UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
@@ -50,6 +56,13 @@ public:
 
 private:
     const glm::ivec2 previewImageSize{75, 75};
+    const float controlPadding = 8.0f;
+    const float controlWidth[3] = { 250.0f, 325.0f, 325.0f };
+    const glm::ivec2 compareButtonSize{ 20.0f, 20.0f };
+    const glm::ivec2 exportButtonSize{100, 25};
+    const float compareButtonSpacing = 10;
+    const float viewModeComboWidth = 150.0f;
+
     const std::vector<ImageGroup>& groups;
 
     GLFWwindow* window;
@@ -68,7 +81,8 @@ private:
     std::array<int, 2> selectedImages = {-1, -1};
     std::filesystem::path directoryPath;
 
-    void renderControlPanelGroups();
+    void renderControlPanelGroupOptions();
+    void renderControlPanelGroupsList();
     void renderControlPanelFiles();
     void renderControlPanelSaveFilenames();
     void renderControlPanelSaveImages();
@@ -77,6 +91,9 @@ private:
     void renderImageViewOverlay(int imageView, glm::vec2 position);
     void renderPreviewProgress();
     void selectImage(int imageView, int id);
-    std::string bytesToSizeString(int bytes);
     bool mouseOverlappingImage(int imageView);
+
+    void beginControlPanelSection(const char* label);
+    void beginSection(const char* label, float padding, float outerWidth);
+    void endSection();
 };

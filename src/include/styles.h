@@ -48,4 +48,5 @@ void setGlobalStyles() {
 	style.Colors[ImGuiCol_ResizeGripHovered] = Colors::gray3;
 	style.Colors[ImGuiCol_ResizeGripActive] = Colors::gray3;
 
+	style.Colors[ImGuiCol_ScrollbarBg] = Colors::gray1;
 }
