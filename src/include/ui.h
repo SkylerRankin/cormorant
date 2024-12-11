@@ -58,9 +58,9 @@ private:
     const glm::ivec2 previewImageSize{75, 75};
     const float controlPadding = 8.0f;
     const float controlWidth[3] = { 250.0f, 325.0f, 325.0f };
-    const glm::ivec2 compareButtonSize{ 20.0f, 20.0f };
+    const glm::ivec2 compareButtonSize{ 30.0f, 30.0f };
     const glm::ivec2 exportButtonSize{100, 25};
-    const float compareButtonSpacing = 10;
+    const float compareButtonSpacing = 5;
     const float viewModeComboWidth = 150.0f;
 
     const std::vector<ImageGroup>& groups;

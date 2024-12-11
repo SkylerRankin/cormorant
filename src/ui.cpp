@@ -10,6 +10,7 @@
 #include "imageView.h"
 #include "styles.h"
 #include "ui.h"
+#include "res/fontFA6.h"
 #include "res/fontOpenSans.h"
 
 namespace {
@@ -62,6 +63,12 @@ UI::UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* im
 	imageViewer[1] = new ImageViewer(imageCache->getImages());
 
 	io.Fonts->AddFontFromMemoryCompressedBase85TTF(OpenSans_compressed_data_base85, 16);
+
+	static ImFontConfig config;
+	config.MergeMode = true;
+	config.GlyphOffset.y = 2; // 2 pixel y offset for icon font size 18
+	static const ImWchar rangesIcons[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+	io.Fonts->AddFontFromMemoryCompressedBase85TTF(FA6_compressed_data_base85, 18, &config, rangesIcons);
 }
 
 UI::~UI() {
@@ -374,15 +381,13 @@ void UI::renderControlPanelGroupOptions() {
 		}
 	}
 
-	if (countGroupsWithNoSaves == 0) {
-		ImGui::PushStyleColor(ImGuiCol_Text, Colors::green);
-		ImGui::TextWrapped("All groups have at least 1 saved image");
-		ImGui::PopStyleColor();
-	} else {
+	if (countGroupsWithNoSaves > 0) {
 		ImGui::PushStyleColor(ImGuiCol_Text, Colors::yellow);
-		ImGui::TextWrapped("%d group%s with no saved images", countGroupsWithNoSaves, countGroupsWithNoSaves == 1 ? "" : "s");
+		ImGui::TextWrapped("%s  %d group%s with no saved images", ICON_WARNING, countGroupsWithNoSaves, countGroupsWithNoSaves == 1 ? "" : "s");
 		ImGui::PopStyleColor();
 	}
+
+	ImGui::Spacing();
 	
 	endSection();
 }
@@ -615,7 +620,7 @@ void UI::renderControlPanelFiles() {
 				const bool rightSelected = imageID == selectedImages[1];
 
 				if (leftSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-				if (ImGui::Button("<", ImVec2(compareButtonSize.x, compareButtonSize.y))) {
+				if (ImGui::Button(std::format("{}##leftCompare", ICON_ARROW_LEFT).c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
 					selectedImages[0] = imageID;
 					selectImage(0, selectedImages[0]);
 				}
@@ -626,7 +631,7 @@ void UI::renderControlPanelFiles() {
 				ImGui::PopStyleVar();
 
 				if (rightSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-				if (ImGui::Button(">", ImVec2(compareButtonSize.x, compareButtonSize.y))) {
+				if (ImGui::Button(std::format("{}##rightCompare", ICON_ARROW_RIGHT).c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
 					selectedImages[1] = imageID;
 					selectImage(1, selectedImages[1]);
 				}
@@ -816,7 +821,7 @@ void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 	bool imageSkipped = image->skipped;
 
 	if (imageSaved) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-	if (ImGui::Button("Saved", buttonSize)) {
+	if (ImGui::Button("Save", buttonSize)) {
 		onSaveImage(id);
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -825,14 +830,14 @@ void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 	ImGui::SameLine();
 
 	if (imageSkipped) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-	if (ImGui::Button("Skipped", buttonSize)) {
+	if (ImGui::Button("Skip", buttonSize)) {
 		onSkipImage(id);
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 	if (imageSkipped) ImGui::PopStyleColor();
 
 	ImGui::SameLine();
-	if (ImGui::Button("Reset", buttonSize)) {
+	if (ImGui::Button(ICON_RESIZE, buttonSize)) {
 		if (uiState.imageViewMovementLocked) {
 			imageViewer[0]->resetTransform();
 			imageViewer[1]->resetTransform();
