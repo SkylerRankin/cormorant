@@ -57,11 +57,11 @@ public:
     std::function<void(int)> onSaveImage;
 
 private:
-    const glm::ivec2 previewImageSize{75, 75};
+    const glm::vec2 previewImageSize{75, 75};
     const float controlPadding = 8.0f;
     const float controlWidth[3] = { 250.0f, 325.0f, 325.0f };
-    const glm::ivec2 compareButtonSize{ 30.0f, 30.0f };
-    const glm::ivec2 exportButtonSize{100, 25};
+    const glm::vec2 compareButtonSize{ 30.0f, 30.0f };
+    const glm::vec2 exportButtonSize{100, 25};
     const float compareButtonSpacing = 5;
     const float viewModeComboWidth = 150.0f;
 

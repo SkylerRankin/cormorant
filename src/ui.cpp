@@ -809,7 +809,7 @@ void UI::renderSingleImageView() {
 }
 
 void UI::renderCompareImageView() {
-	imageTargetSize.x = (int)ImGui::GetContentRegionAvail().x / 2.0f;
+	imageTargetSize.x = static_cast<int>(ImGui::GetContentRegionAvail().x / 2.0f);
 	imageTargetSize.y = (int)ImGui::GetContentRegionAvail().y;
 	imageTargetPositions[0].x = (int)ImGui::GetWindowPos().x;
 	imageTargetPositions[0].y = (int)ImGui::GetWindowPos().y;

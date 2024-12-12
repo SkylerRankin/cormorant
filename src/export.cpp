@@ -1,3 +1,4 @@
+#include <format>
 #include <fstream>
 #include "application.h"
 #include "export.h"
@@ -75,8 +76,12 @@ namespace Export {
         outputFile << "-- Cormorant --" << std::endl;
         outputFile << "Saved images for directory \"" << directoryPath.string() << "\"" << std::endl;
 
-        auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        outputFile << "This file was generated on " << std::ctime(&time) << std::endl;
+        auto zonedTime = std::chrono::zoned_time{
+            std::chrono::current_zone(),
+            std::chrono::system_clock::now()
+        };
+        outputFile << std::format("This file was generated on {:%Y-%m-%d %H:%M}", zonedTime.get_local_time()) << "." << std::endl;
+        outputFile << std::endl;
 
         float increment = 1.0f / images.size();
         for (auto& e : images) {

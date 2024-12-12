@@ -119,7 +119,7 @@ void ImageCache::threadInitCacheFromDirectory(std::string path, std::atomic_bool
 			image.id = nextImageID++;
 			image.path = entryPathString;
 			image.filename = entryPath.filename().string();
-			image.filesize = fs::file_size(entryPath);
+			image.filesize = static_cast<unsigned int>(fs::file_size(entryPath));
 			image.previewSize = previewTextureSize;
 
 			int width, height, components;
@@ -244,9 +244,9 @@ bool ImageCache::loadImageFromFile(int id, bool loadPreview, unsigned char*& ima
 		const float previewAspectRatio = previewTextureSize.x / (float)previewTextureSize.y;
 		glm::ivec2 resizeSize = previewTextureSize;
 		if (aspectRatio > previewAspectRatio) {
-			resizeSize.y *= (previewAspectRatio / aspectRatio);
+			resizeSize.y = static_cast<int>(floor(resizeSize.y * (previewAspectRatio / aspectRatio)));
 		} else if (aspectRatio < previewAspectRatio) {
-			resizeSize.x *= (aspectRatio / previewAspectRatio);
+			resizeSize.x = static_cast<int>(floor(resizeSize.x * (aspectRatio / previewAspectRatio)));
 		}
 
 		unsigned char* previewData;
@@ -440,7 +440,7 @@ void ImageCache::useImageFullTexture(int id) {
 void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
 	// No point in pushing more items to the queue than the cache has capacity, since
 	// this will just result in evicting stuff that was just added.
-	int maxIndex = ids.size() - 1;
+	size_t maxIndex = ids.size() - 1;
 	if (ids.size() > cacheCapacity) {
 		maxIndex = cacheCapacity - 1;
 	}
@@ -550,8 +550,8 @@ void ImageCache::evictOldestImage() {
 ImageTimestamp ImageCache::parseEXIFTimestamp(std::string text) {
 	ImageTimestamp timestamp{};
 
-	int start = 0;
-	int end = text.find(':', start);
+	size_t start = 0;
+	size_t end = text.find(':', start);
 	timestamp.year = std::stoi(text.substr(start, end));
 	start = end + 1;
 
