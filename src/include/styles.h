@@ -49,4 +49,7 @@ void setGlobalStyles() {
 	style.Colors[ImGuiCol_ResizeGripActive] = Colors::gray3;
 
 	style.Colors[ImGuiCol_ScrollbarBg] = Colors::gray1;
+
+	style.ChildRounding = 4.0f;
+	style.FrameRounding = 2.0f;
 }

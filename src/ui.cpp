@@ -436,7 +436,7 @@ void UI::renderControlPanelGroupOptions() {
 
 	if (countGroupsWithNoSaves > 0) {
 		ImGui::PushStyleColor(ImGuiCol_Text, Colors::yellow);
-		ImGui::TextWrapped("%s  %d group%s with no saved images", ICON_WARNING, countGroupsWithNoSaves, countGroupsWithNoSaves == 1 ? "" : "s");
+		ImGui::TextWrapped("%d with no saved images", countGroupsWithNoSaves);
 		ImGui::PopStyleColor();
 	}
 
