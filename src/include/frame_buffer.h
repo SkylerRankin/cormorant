@@ -13,7 +13,7 @@ public:
 
 private:
 	const GLuint textureUnit = GL_TEXTURE0;
-	GLuint fbo;
+	GLuint fbo = 0;
 	GLuint texture;
-	GLuint rbo;
+	GLuint rbo = 0;
 };

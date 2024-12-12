@@ -40,6 +40,11 @@ public:
     // now skipped, the UI should automatically move to the next unskipped image.
     void skippedImage();
     void setShowPreviewProgress(bool enabled);
+    // Next two functions calls when a new image directory is opened, and then when all previews for that directory
+    // have been processed. In between the two calls, the UI will prevent groups from being opened since the images
+    // likely won't be ready yet.
+    void startLoadingImages();
+    void endLoadingImages();
 
     // Input handling
     void inputClick(int button, int action, int mods);
@@ -71,6 +76,8 @@ private:
     ImageCache* imageCache;
     glm::ivec2 imageTargetSize;
     std::array<glm::ivec2, 2> imageTargetPositions;
+    bool allowGroupInteraction = false;
+    bool allowExports = false;
     bool showPreviewProgress = false;
     float previewProgress = 0.0f;
 

@@ -16,7 +16,7 @@ Application::Application(GLFWwindow* window) : window(window) {
     // Setup UI callbacks
     ui->onDirectoryOpened = [this](std::string path) -> void {
         processingState = ProcessingState_LoadingDirectory;
-        ui->setControlPanelState(ControlPanel_DirectoryLoading);
+        ui->startLoadingImages();
         cache->initCacheFromDirectory(path, directoryLoaded);
         directoryPath = std::filesystem::path{ path };
     };
@@ -77,7 +77,7 @@ void Application::frameUpdate() {
     case ProcessingState_LoadingPreviews:
         if (cache->previewLoadingComplete()) {
             processingState = ProcessingState_None;
-            ui->setShowPreviewProgress(false);
+            ui->endLoadingImages();
         }
         break;
     }

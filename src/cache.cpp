@@ -316,6 +316,7 @@ void ImageCache::processPendingImageQueue() {
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, imageEntry.pbo);
 		glBufferData(GL_PIXEL_UNPACK_BUFFER, pboBytes, 0, GL_STATIC_DRAW);
 		imageEntry.pboMapping = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 		{
 			std::lock_guard<std::mutex> guard(imageQueueMutex);
@@ -353,6 +354,7 @@ void ImageCache::processTextureQueue() {
 			// Unbind the PBO
 			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
 			glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 			// Make this PBO available immediately
 			PBOQueueEntry pboEntry{
@@ -383,6 +385,7 @@ void ImageCache::processTextureQueue() {
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureSize.x, textureSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 		pboToFence.emplace(entry.pbo, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 		if (entry.isPreview) {

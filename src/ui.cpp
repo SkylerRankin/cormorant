@@ -162,7 +162,7 @@ void UI::renderFrame() {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Export")) {
-			if (imageCache->getImages().size() == 0) {
+			if (!allowExports) {
 				ImGui::BeginDisabled();
 			}
 			if (ImGui::MenuItem("Copy saved images")) {
@@ -171,7 +171,7 @@ void UI::renderFrame() {
 			if (ImGui::MenuItem("Save filenames")) {
 				controlPanelState = ControlPanel_SaveFilenames;
 			}
-			if (imageCache->getImages().size() == 0) {
+			if (!allowExports) {
 				ImGui::EndDisabled();
 			}
 			ImGui::EndMenu();
@@ -301,6 +301,7 @@ void UI::renderControlPanelGroupOptions() {
 	ImGui::BeginChild("group_parameter_window", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
 	if (ImGui::CollapsingHeader("Group Parameters")) {
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, previousWindowPadding);
+		if (!allowGroupInteraction) ImGui::BeginDisabled();
 
 		ImGui::BeginTable("parameters_table", 2);
 
@@ -350,10 +351,10 @@ void UI::renderControlPanelGroupOptions() {
 
 		ImGui::Spacing();
 
-		float tableWidth = ImGui::GetContentRegionAvail().x;
 		if (ImGui::Button("Regenerate Groups")) {
 			onRegenerateGroups();
 		}
+		if (!allowGroupInteraction) ImGui::EndDisabled();
 		ImGui::Spacing();
 		ImGui::PopStyleVar();
 	}
@@ -401,7 +402,7 @@ void UI::renderControlPanelGroupsList() {
 	float groupItemWidth = ImGui::GetContentRegionAvail().x - controlPadding * 2;
 
 	for (int i = 0; i < groups.size(); i++) {
-		if (hoveredChildIndex == i) {
+		if (hoveredChildIndex == i && allowGroupInteraction) {
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
 		}
 
@@ -437,26 +438,25 @@ void UI::renderControlPanelGroupsList() {
 		ImGui::EndChild();
 		ImGui::Spacing();
 
-		if (hoveredChildIndex == i) {
-			ImGui::PopStyleColor();
-		}
+		if (allowGroupInteraction) {
+			if (hoveredChildIndex == i) {
+				ImGui::PopStyleColor();
+			}
 
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-		}
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+				hoveredChildIndex = i;
+				anyChildHovered = true;
+			}
 
-		if (ImGui::IsItemHovered()) {
-			hoveredChildIndex = i;
-			anyChildHovered = true;
-		}
-
-		if (ImGui::IsItemClicked()) {
-			selectedGroup = i;
-			onGroupSelected(selectedGroup);
-			controlPanelState = ControlPanel_ShowFiles;
-			selectedImages.fill(-1);
-			selectImage(0, -1);
-			selectImage(1, -1);
+			if (ImGui::IsItemClicked()) {
+				selectedGroup = i;
+				onGroupSelected(selectedGroup);
+				controlPanelState = ControlPanel_ShowFiles;
+				selectedImages.fill(-1);
+				selectImage(0, -1);
+				selectImage(1, -1);
+			}
 		}
 	}
 
@@ -1000,6 +1000,21 @@ void UI::skippedImage() {
 		selectedImages[imageView] = newImage;
 		selectImage(imageView, newImage);
 	}
+}
+
+void UI::startLoadingImages() {
+	controlPanelState = ControlPanel_DirectoryLoading;
+	allowGroupInteraction = false;
+	allowExports = false;
+	showPreviewProgress = true;
+	previewProgress = 0.0f;
+}
+
+void UI::endLoadingImages() {
+	allowGroupInteraction = true;
+	allowExports = true;
+	showPreviewProgress = false;
+	previewProgress = 0.0f;
 }
 
 void UI::setShowPreviewProgress(bool enabled) {
