@@ -42,8 +42,8 @@ namespace {
 	std::string bytesToSizeString(int bytes);
 }
 
-UI::UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
-	: window(window), imageTargetSize(glm::ivec2(1, 1)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
+UI::UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters)
+	: window(window), config(config), imageTargetSize(glm::ivec2(1, 1)), groups(groups), imageCache(imageCache), groupParameters(groupParameters) {
 	IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
@@ -64,11 +64,11 @@ UI::UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* im
 
 	io.Fonts->AddFontFromMemoryCompressedBase85TTF(OpenSans_compressed_data_base85, 16);
 
-	static ImFontConfig config;
-	config.MergeMode = true;
-	config.GlyphOffset.y = 2; // 2 pixel y offset for icon font size 18
+	static ImFontConfig fontConfig;
+	fontConfig.MergeMode = true;
+	fontConfig.GlyphOffset.y = 2; // 2 pixel y offset for icon font size 18
 	static const ImWchar rangesIcons[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-	io.Fonts->AddFontFromMemoryCompressedBase85TTF(FA6_compressed_data_base85, 18, &config, rangesIcons);
+	io.Fonts->AddFontFromMemoryCompressedBase85TTF(FA6_compressed_data_base85, 18, &fontConfig, rangesIcons);
 }
 
 UI::~UI() {
@@ -77,6 +77,58 @@ UI::~UI() {
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
+}
+
+void UI::inputKey(int key) {
+	if (config.keyToAction.contains(key)) {
+		switch (config.keyToAction.at(key)) {
+		case KeyAction_Next:
+			goToNextUnskippedImage();
+			break;
+		case KeyAction_Previous:
+			goToPreviousUnskippedImage();
+			break;
+		case KeyAction_Reset:
+			if (mouseOverlappingImage(0)) {
+				imageViewer[0]->resetTransform();
+				if (uiState.imageViewMovementLocked) {
+					imageViewer[1]->resetTransform();
+				}
+			} else if (mouseOverlappingImage(1)) {
+				imageViewer[1]->resetTransform();
+				if (uiState.imageViewMovementLocked) {
+					imageViewer[0]->resetTransform();
+				}
+			}
+			break;
+		case KeyAction_Save:
+			if (mouseOverlappingImage(0)) {
+				onSaveImage(selectedImages[0]);
+			} else if (mouseOverlappingImage(1)) {
+				onSaveImage(selectedImages[1]);
+			}
+			break;
+		case KeyAction_Skip:
+			if (mouseOverlappingImage(0)) {
+				onSkipImage(selectedImages[0]);
+			} else if (mouseOverlappingImage(1)) {
+				onSkipImage(selectedImages[1]);
+			}
+			break;
+		case KeyAction_ToggleHideSkipped:
+			uiState.hideSkippedImages = !uiState.hideSkippedImages;
+			break;
+		case KeyAction_ToggleLockMovement:
+			if (uiState.viewMode == ViewMode_ManualCompare) {
+				uiState.imageViewMovementLocked = !uiState.imageViewMovementLocked;
+				if (uiState.imageViewMovementLocked) {
+					imageViewer[0]->resetTransform();
+					imageViewer[1]->resetTransform();
+				}
+			}
+			break;
+		}
+	}
 }
 
 void UI::inputClick(int button, int action, int mods) {
@@ -512,11 +564,11 @@ void UI::renderControlPanelFiles() {
 			ImGui::BeginDisabled();
 		}
 
-		static bool movementLocked = true;
-		if (ImGui::Checkbox("Lock movement", &movementLocked)) {
-			uiState.imageViewMovementLocked = movementLocked;
-			imageViewer[0]->resetTransform();
-			imageViewer[1]->resetTransform();
+		if (ImGui::Checkbox("Lock movement", &uiState.imageViewMovementLocked)) {
+			if (uiState.imageViewMovementLocked) {
+				imageViewer[0]->resetTransform();
+				imageViewer[1]->resetTransform();
+			}
 		}
 
 		if (uiState.viewMode == ViewMode_Single) {
@@ -741,7 +793,8 @@ void UI::renderSingleImageView() {
 
 	bool showControls =
 		controlPanelState == ControlPanel_ShowFiles &&
-		selectedImages[0] != -1;
+		selectedImages[0] != -1 &&
+		mouseOverlappingImage(0);
 
 	if (showControls) {
 		// Renders the image view overlay
@@ -772,13 +825,8 @@ void UI::renderCompareImageView() {
 	ImGui::PopStyleVar();
 
 	// Render the overlay only for the image view overlapping the cursor
-	ImVec2 mousePosition = ImGui::GetMousePos();
-	bool leftImageHovered =
-		mousePosition.x >= imageTargetPositions[0].x && mousePosition.x <= imageTargetPositions[0].x + imageTargetSize.x &&
-		mousePosition.y >= imageTargetPositions[0].y && mousePosition.y <= imageTargetPositions[0].y + imageTargetSize.y;
-	bool rightImageHovered =
-		mousePosition.x >= imageTargetPositions[1].x && mousePosition.x <= imageTargetPositions[1].x + imageTargetSize.x &&
-		mousePosition.y >= imageTargetPositions[1].y && mousePosition.y <= imageTargetPositions[1].y + imageTargetSize.y;
+	bool leftImageHovered = mouseOverlappingImage(0);
+	bool rightImageHovered = mouseOverlappingImage(1);
 
 	if (controlPanelState == ControlPanel_ShowFiles && selectedImages[0] != -1 && leftImageHovered) {
 		const float topMargin = 10;

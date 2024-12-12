@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic>
 #include <vector>
+#include "config.h"
 #include "glCommon.h"
 #include "group.h"
 
@@ -26,6 +27,7 @@ public:
 
 private:
 	GLFWwindow* window;
+	Config config;
 	UI* ui;
 	ImageCache* cache;
 	std::vector<ImageGroup> groups;

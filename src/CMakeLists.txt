@@ -9,13 +9,13 @@ include_directories(include)
 set(CXX_HEADERS
     include/application.h
     include/cache.h
+    include/config.h
     include/export.h
+    include/glCommon.h
     include/group.h
     include/frame_buffer.h
-    include/glCommon.h
     include/imageView.h
     include/styles.h
-    include/imguiConfig.h
     include/ui.h
     res/fontFA6.h
     res/fontOpenSans.h
@@ -26,10 +26,10 @@ set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
 set(CXX_SRCS
     application.cpp
     cache.cpp
-    glCommon.cpp
     export.cpp
-    group.cpp
     frame_buffer.cpp
+    glCommon.cpp
+    group.cpp
     imageView.cpp
     main.cpp
     ui.cpp

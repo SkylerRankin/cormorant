@@ -7,6 +7,7 @@
 #include "glCommon.h"
 #include "group.h"
 #include "cache.h"
+#include "config.h"
 
 enum ControlPanelState {
     ControlPanel_NothingLoaded = 0,
@@ -25,17 +26,12 @@ enum ViewMode {
 
 class UI {
 public:
-    UI(GLFWwindow* window, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
+    UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
     ~UI();
     void renderFrame();
     int getCurrentGroupIndex() const;
     void setControlPanelState(ControlPanelState newState);
 
-    // For all relevant image views, update the selected image to the next unskipped image that is not
-    // also used by another image view. If there are no more unskipped images, the selected image is
-    // set to -1.
-    void goToNextUnskippedImage();
-    void goToPreviousUnskippedImage();
     // Called when the skipped flag on an image is changed. This is required because if the selected image is
     // now skipped, the UI should automatically move to the next unskipped image.
     void skippedImage();
@@ -47,6 +43,7 @@ public:
     void endLoadingImages();
 
     // Input handling
+    void inputKey(int key);
     void inputClick(int button, int action, int mods);
     void inputMouseMove(double x, double y);
     void inputScroll(int offset);
@@ -69,6 +66,7 @@ private:
     const float viewModeComboWidth = 150.0f;
 
     const std::vector<ImageGroup>& groups;
+    const Config& config;
 
     GLFWwindow* window;
     ImageViewer* imageViewer[2];
@@ -99,6 +97,12 @@ private:
     void renderPreviewProgress();
     void selectImage(int imageView, int id);
     bool mouseOverlappingImage(int imageView);
+
+    // For all relevant image views, update the selected image to the next unskipped image that is not
+    // also used by another image view. If there are no more unskipped images, the selected image is
+    // set to -1.
+    void goToNextUnskippedImage();
+    void goToPreviousUnskippedImage();
 
     void beginControlPanelSection(const char* label);
     void beginSection(const char* label, float padding, float outerWidth);

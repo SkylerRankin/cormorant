@@ -9,7 +9,7 @@
 
 Application::Application(GLFWwindow* window) : window(window) {
     cache = new ImageCache();
-    ui = new UI(window, groups, cache, groupParameters);
+    ui = new UI(window, config, groups, cache, groupParameters);
 
     directoryLoaded.store(false);
 
@@ -85,11 +85,7 @@ void Application::frameUpdate() {
 
 void Application::onKeyPress(int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
-        if (key == GLFW_KEY_UP || key == GLFW_KEY_LEFT || key == GLFW_KEY_W) {
-            ui->goToPreviousUnskippedImage();
-        } else if (key == GLFW_KEY_DOWN || key == GLFW_KEY_RIGHT || key == GLFW_KEY_S) {
-            ui->goToNextUnskippedImage();
-        }
+        ui->inputKey(key);
     }
 }
 
