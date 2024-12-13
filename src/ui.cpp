@@ -190,10 +190,10 @@ void UI::inputScroll(int offset) {
 	}
 }
 
-void UI::renderFrame() {
-	imageViewer[0]->renderFrame(imageTargetSize);
+void UI::renderFrame(double elapsed) {
+	imageViewer[0]->renderFrame(elapsed, imageTargetSize);
 	if (uiState.viewMode != ViewMode_Single) {
-		imageViewer[1]->renderFrame(imageTargetSize);
+		imageViewer[1]->renderFrame(elapsed, imageTargetSize);
 	}
 
 	ImGui_ImplOpenGL3_NewFrame();

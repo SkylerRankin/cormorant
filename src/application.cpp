@@ -42,6 +42,8 @@ Application::Application(GLFWwindow* window) : window(window) {
         toggleSkipImage(id);
         ui->skippedImage();
     };
+
+    previousFrameTime = glfwGetTime();
 }
 
 Application::~Application() {
@@ -50,6 +52,9 @@ Application::~Application() {
 }
 
 void Application::frameUpdate() {
+    double elapsed = glfwGetTime() - previousFrameTime;
+    previousFrameTime = glfwGetTime();
+
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
@@ -58,7 +63,7 @@ void Application::frameUpdate() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     cache->frameUpdate();
-    ui->renderFrame();
+    ui->renderFrame(elapsed);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

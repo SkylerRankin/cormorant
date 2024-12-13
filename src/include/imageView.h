@@ -15,7 +15,7 @@ struct RectObject {
 class ImageViewer {
 public:
 	ImageViewer(const std::map<int, Image>&);
-	void renderFrame(glm::ivec2 targetSize);
+	void renderFrame(double elapsed, glm::ivec2 targetSize);
 	void updateTargetSize(glm::ivec2 newSize);
 	void zoom(int amount, glm::ivec2 position);
 	void pan(glm::ivec2 offset);
@@ -31,7 +31,12 @@ private:
 	FrameBuffer frameBuffer;
 
 	const float zoomSpeed = 0.75f;
+	// Unit is %distance per second
+	float zoomLag = 6.0f;
 	float currentZoom = 0.0f;
+	float targetZoom = 0.0f;
+	bool animatingZoom = false;
+	glm::vec2 targetZoomPosition;
 	glm::vec2 panOffset = glm::vec2(0, 0);
 
 	GLuint shaderProgram;
@@ -49,4 +54,9 @@ private:
 	the image's aspect ratio.
 	*/
 	void clampPanToEdges();
+	/*
+	When animating a zoom, this updates the current zoom, slowly approaching the target zoom.
+	The pan offset is also updated to align with the updated zoom.
+	*/
+	void updateZoom(double elapsed);
 };

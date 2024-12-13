@@ -39,7 +39,11 @@ ImageViewer::ImageViewer(const std::map<int, Image>& images) : images(images) {
 	buildShaders();
 }
 
-void ImageViewer::renderFrame(glm::ivec2 targetSize) {
+void ImageViewer::renderFrame(double elapsed, glm::ivec2 targetSize) {
+	if (animatingZoom) {
+		updateZoom(elapsed);
+	}
+
 	// The space available in UI to render image may have changed since last frame.
 	// If so, the aspect ratio transform needs to be updated as well as the frame
 	// buffer dimensions.
@@ -69,7 +73,7 @@ void ImageViewer::updateTargetSize(glm::ivec2 newSize) {
 
 /*
 Zooming is relative to the mouse position. This means the pixel under the mouse should not be
-translated with zooming. If the zoom position would require additional background space to be
+translated when zooming. If the zoom position would require additional background space to be
 shown, then the pan offset update is modified by a call to `clampPanToEdges`.
 */
 void ImageViewer::zoom(int amount, glm::ivec2 position) {
@@ -77,26 +81,10 @@ void ImageViewer::zoom(int amount, glm::ivec2 position) {
 		return;
 	}
 
-	float previousZoom = currentZoom;
-	currentZoom += zoomSpeed * amount;
-	if (currentZoom < 0.0f) {
-		currentZoom = 0.0f;
-	}
-
-	// Current center of image, in screen space coordinates
-	glm::vec2 screenSpaceCenter = glm::vec2(panOffset.x, -1.0f * panOffset.y);
-	// Position of cursor, in screen space coordinates
-	glm::vec2 screenSpacePosition = glm::vec2(position) / glm::vec2(imageTargetSize) * 2.0f - 1.0f;
-	glm::vec2 screenSpaceDiff = screenSpacePosition - screenSpaceCenter;
-
-	// The screen space offset from current pixel position to its position after scaling. Need to use
-	// the ratio of current zoom to previous here. The original point was already scaled by the previous
-	// zoom factor, so only the additional zoom should be used.
-	glm::vec2 offset = screenSpaceDiff * (getZoomFactor(currentZoom) / getZoomFactor(previousZoom)) - screenSpaceDiff;
-	offset.y *= -1;
-	panOffset -= offset;
-	clampPanToEdges();
-	updatePanZoomTransform();
+	targetZoom += zoomSpeed * amount;
+	if (targetZoom < 0.0f) targetZoom = 0.0f;
+	targetZoomPosition = position;
+	animatingZoom = true;
 }
 
 /*
@@ -111,6 +99,7 @@ void ImageViewer::pan(glm::ivec2 offset) {
 		return;
 	}
 
+	animatingZoom = false;
 	panOffset.x += offset.x / (float)imageTargetSize.x * 2.0f;
 	panOffset.y += -1 * offset.y / (float)imageTargetSize.y * 2.0f;
 	clampPanToEdges();
@@ -267,6 +256,8 @@ void ImageViewer::updatePanZoomTransform() {
 void ImageViewer::resetTransform() {
 	currentZoom = 0.0f;
 	panOffset = glm::vec2(0, 0);
+	targetZoom = 0.0f;
+	animatingZoom = false;
 	updatePanZoomTransform();
 }
 
@@ -280,6 +271,17 @@ float min(float a, float b) {
 
 float max(float a, float b) {
 	return a > b ? a : b;
+}
+
+float lerp(float a, float b, float t) {
+	return a + t * (b - a);
+}
+
+glm::vec2 lerp(glm::vec2 a, glm::vec2 b, float t) {
+	return glm::vec2(
+		lerp(a.x, b.x, t),
+		lerp(a.y, b.y, t)
+	);
 }
 
 void ImageViewer::clampPanToEdges() {
@@ -304,4 +306,31 @@ void ImageViewer::clampPanToEdges() {
 	if (-imageBaseScale.y * zoomFactor + panOffset.y > max(-imageBaseScale.y * zoomFactor, -1.0f)) {
 		panOffset.y = max(-imageBaseScale.y * zoomFactor, -1.0f) - (-imageBaseScale.y * zoomFactor);
 	}
+}
+
+void ImageViewer::updateZoom(double elapsed) {
+	if (abs(currentZoom - targetZoom) <= 0.01f) {
+		currentZoom = targetZoom;
+		animatingZoom = false;
+	} else {
+		float previousZoom = currentZoom;
+		currentZoom += (targetZoom - currentZoom) * zoomLag * static_cast<float>(elapsed);
+
+		// Calculate new pan offset since zoom has changed
+
+		// Current center of image, in screen space coordinates
+		glm::vec2 screenSpaceCenter = glm::vec2(panOffset.x, -1.0f * panOffset.y);
+		// Position of cursor, in screen space coordinates
+		glm::vec2 screenSpacePosition = glm::vec2(targetZoomPosition) / glm::vec2(imageTargetSize) * 2.0f - 1.0f;
+		glm::vec2 screenSpaceDiff = screenSpacePosition - screenSpaceCenter;
+		// The screen space offset from current pixel position to its position after scaling. Need to use
+		// the ratio of current zoom to previous here. The original point was already scaled by the previous
+		// zoom factor, so only the additional zoom should be used.
+		glm::vec2 offset = screenSpaceDiff * (getZoomFactor(currentZoom) / getZoomFactor(previousZoom)) - screenSpaceDiff;
+		offset.y *= -1;
+		panOffset -= offset;
+	}
+
+	clampPanToEdges();
+	updatePanZoomTransform();
 }

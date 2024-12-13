@@ -28,7 +28,7 @@ class UI {
 public:
     UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters);
     ~UI();
-    void renderFrame();
+    void renderFrame(double elapsed);
     int getCurrentGroupIndex() const;
     void setControlPanelState(ControlPanelState newState);
 

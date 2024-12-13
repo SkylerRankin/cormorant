@@ -32,6 +32,7 @@ private:
 	ImageCache* cache;
 	std::vector<ImageGroup> groups;
 	GroupParameters groupParameters;
+	double previousFrameTime;
 
 	// Data processing
 	ProcessingState processingState = ProcessingState_None;
