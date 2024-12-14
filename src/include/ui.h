@@ -54,6 +54,9 @@ public:
     std::function<void()> onRegenerateGroups;
     std::function<void(int)> onSkipImage;
     std::function<void(int)> onSaveImage;
+    std::function<void(int)> onSkipGroup;
+    std::function<void(int)> onSaveGroup;
+    std::function<void(int)> onResetGroup;
 
 private:
     const glm::vec2 previewImageSize{75, 75};
@@ -63,6 +66,7 @@ private:
     const glm::vec2 exportButtonSize{100, 25};
     const float compareButtonSpacing = 5;
     const float viewModeComboWidth = 150.0f;
+    const float rightClickMenuWidth = 150.0f;
 
     const std::vector<ImageGroup>& groups;
     const Config& config;

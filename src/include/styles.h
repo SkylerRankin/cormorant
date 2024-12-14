@@ -15,8 +15,9 @@ namespace Colors {
 	const ImVec4 gray2				= ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
 	const ImVec4 gray3				= ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
 	const ImVec4 gray3Transparent	= ImVec4(0.25f, 0.25f, 0.25f, 0.50f);
-	const ImVec4 gray4				= ImVec4(0.40f, 0.40f, 0.40f, 1.00f);
-	const ImVec4 gray4Transparent	= ImVec4(0.40f, 0.40f, 0.40f, 0.50f);
+	const ImVec4 gray4				= ImVec4(0.32f, 0.32f, 0.32f, 1.00f);
+	const ImVec4 gray5				= ImVec4(0.40f, 0.40f, 0.40f, 1.00f);
+	const ImVec4 gray5Transparent	= ImVec4(0.40f, 0.40f, 0.40f, 0.50f);
 }
 
 void setGlobalStyles() {
@@ -27,21 +28,21 @@ void setGlobalStyles() {
 	style.Colors[ImGuiCol_Border] = Colors::gray2;
 	
 	style.Colors[ImGuiCol_Header] = Colors::gray3;
-	style.Colors[ImGuiCol_HeaderHovered] = Colors::gray4;
+	style.Colors[ImGuiCol_HeaderHovered] = Colors::gray5;
 	style.Colors[ImGuiCol_HeaderActive] = Colors::gray3;
 
 	style.Colors[ImGuiCol_Button] = Colors::gray3;
-	style.Colors[ImGuiCol_ButtonHovered] = Colors::gray4;
-	style.Colors[ImGuiCol_ButtonActive] = Colors::gray4;
+	style.Colors[ImGuiCol_ButtonHovered] = Colors::gray5;
+	style.Colors[ImGuiCol_ButtonActive] = Colors::gray5;
 
 	// "Frame" colors apply to the background of checkboxes and slider, among other widgets
 	style.Colors[ImGuiCol_FrameBg] = Colors::gray3;
 	style.Colors[ImGuiCol_FrameBgHovered] = Colors::gray3;
 	style.Colors[ImGuiCol_FrameBgActive] = Colors::gray3;
 
-	style.Colors[ImGuiCol_CheckMark] = Colors::gray4;
-	style.Colors[ImGuiCol_SliderGrab] = Colors::gray4;
-	style.Colors[ImGuiCol_SliderGrabActive] = Colors::gray4;
+	style.Colors[ImGuiCol_CheckMark] = Colors::gray5;
+	style.Colors[ImGuiCol_SliderGrab] = Colors::gray5;
+	style.Colors[ImGuiCol_SliderGrabActive] = Colors::gray5;
 
 	// Applies to the resizable borders within dockspaces
 	style.Colors[ImGuiCol_ResizeGrip] = Colors::gray2;
@@ -49,6 +50,8 @@ void setGlobalStyles() {
 	style.Colors[ImGuiCol_ResizeGripActive] = Colors::gray3;
 
 	style.Colors[ImGuiCol_ScrollbarBg] = Colors::gray1;
+
+	style.Colors[ImGuiCol_PopupBg] = Colors::gray1;
 
 	style.ChildRounding = 4.0f;
 	style.FrameRounding = 2.0f;

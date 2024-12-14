@@ -478,7 +478,7 @@ void UI::renderControlPanelGroupsList() {
 
 	for (int i = 0; i < groups.size(); i++) {
 		if (hoveredChildIndex == i && allowGroupInteraction) {
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::gray2);
 		}
 
 		ImGui::SetCursorPosX(controlPadding);
@@ -511,6 +511,30 @@ void UI::renderControlPanelGroupsList() {
 			ImGui::EndTable();
 		}
 		ImGui::EndChild();
+
+		// Group right click popup
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::gray1);
+		if (ImGui::BeginPopupContextItem()) {
+			ImGui::BeginChild(std::format("group popup {}", i).c_str(), ImVec2(rightClickMenuWidth, 0), ImGuiChildFlags_AutoResizeY);
+			ImGui::TextWrapped("Group %d", i + 1);
+			ImGui::Separator();
+			if (ImGui::Selectable("Save all images")) {
+				onSaveGroup(i);
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::Selectable("Skip all images")) {
+				onSkipGroup(i);
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::Selectable("Reset all images")) {
+				onResetGroup(i);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndChild();
+			ImGui::EndPopup();
+		}
+		ImGui::PopStyleColor();
+
 		ImGui::Spacing();
 
 		if (allowGroupInteraction) {
@@ -640,10 +664,13 @@ void UI::renderControlPanelFiles() {
 
 		if (image->skipped && uiState.hideSkippedImages) continue;
 
+		bool setChildBackgroundColor = false;
 		if (imageID == selectedImages[0] || imageID == selectedImages[1]) {
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(50, 50, 50, 255));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::gray3);
+			setChildBackgroundColor = true;
 		} else if (imageID == hoveredChildIndex) {
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 255));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::gray2);
+			setChildBackgroundColor = true;
 		}
 
 		ImGui::SetCursorPosX(controlPadding);
@@ -663,12 +690,12 @@ void UI::renderControlPanelFiles() {
 			ImGui::TableSetColumnIndex(1);
 
 			if (image->saved) {
-				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(69, 173, 73, 255));
+				ImGui::PushStyleColor(ImGuiCol_Text, Colors::green);
 			} else if (image->skipped) {
 				ImGui::PushStyleColor(ImGuiCol_Text, Colors::textDisabled);
 			}
 
-			ImGui::Text(image->filename.c_str());
+			ImGui::Text(image->shortFilename.c_str());
 
 			if (image->saved) {
 				ImGui::PopStyleColor();
@@ -701,7 +728,7 @@ void UI::renderControlPanelFiles() {
 				const bool rightSelected = imageID == selectedImages[1];
 
 				if (leftSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-				else ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray3);
+				else ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray4);
 				if (ImGui::Button(std::format("##leftCompare").c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
 					selectImage(0, imageID);
 				}
@@ -712,7 +739,7 @@ void UI::renderControlPanelFiles() {
 				ImGui::PopStyleVar();
 
 				if (rightSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-				else ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray3);
+				else ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray4);
 				if (ImGui::Button(std::format("##rightCompare").c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
 					selectImage(1, imageID);
 				}
@@ -723,6 +750,26 @@ void UI::renderControlPanelFiles() {
 		}
 
 		ImGui::EndChild();
+
+		// File right click popup
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::gray1);
+		if (ImGui::BeginPopupContextItem()) {
+			ImGui::BeginChild(std::format("file popup {}", imageID).c_str(), ImVec2(rightClickMenuWidth, 0), ImGuiChildFlags_AutoResizeY);
+			ImGui::TextWrapped(image->filename.c_str());
+			ImGui::Separator();
+			if (ImGui::Selectable(image->saved ? "Undo save" : "Save")) {
+				onSaveImage(imageID);
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::Selectable(image->skipped ? "Undo skip" : "Skip")) {
+				onSkipImage(imageID);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndChild();
+			ImGui::EndPopup();
+		}
+		ImGui::PopStyleColor();
+
 		ImGui::Spacing();
 
 		if (uiState.scrollToSelectedFile && imageID == selectedImages[0]) {
@@ -730,7 +777,7 @@ void UI::renderControlPanelFiles() {
 			ImGui::ScrollToItem();
 		}
 
-		if (imageID == hoveredChildIndex || imageID == selectedImages[0] || imageID == selectedImages[1]) {
+		if (setChildBackgroundColor) {
 			ImGui::PopStyleColor();
 		}
 
@@ -885,7 +932,7 @@ void UI::renderImageViewOverlay(int imageView, glm::vec2 position) {
 	ImGui::SetNextWindowPos(ImVec2(position.x, position.y));
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::transparent);
 	ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray3Transparent);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::gray4Transparent);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Colors::gray5Transparent);
 
 	ImGui::BeginChild("right_controls", controlSize);
 

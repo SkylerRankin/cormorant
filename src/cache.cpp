@@ -122,6 +122,12 @@ void ImageCache::threadInitCacheFromDirectory(std::string path, std::atomic_bool
 			image.filesize = static_cast<unsigned int>(fs::file_size(entryPath));
 			image.previewSize = previewTextureSize;
 
+			if (image.filename.size() <= shortFilenameLength) {
+				image.shortFilename = image.filename;
+			} else {
+				image.shortFilename = "..." + image.filename.substr(image.filename.size() - shortFilenameLength + 3);
+			}
+
 			int width, height, components;
 			if (stbi_info(image.path.c_str(), &width, &height, &components)) {
 				image.size = glm::ivec2(width, height);

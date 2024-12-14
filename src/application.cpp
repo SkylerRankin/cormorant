@@ -43,6 +43,36 @@ Application::Application(GLFWwindow* window) : window(window) {
         ui->skippedImage();
     };
 
+    ui->onSaveGroup = [this](int i) -> void {
+        ImageGroup& group = groups.at(i);
+        for (int id : group.ids) {
+            cache->getImage(id)->saved = true;
+            cache->getImage(id)->skipped = false;
+        }
+        group.savedCount = static_cast<int>(group.ids.size());
+        group.skippedCount = 0;
+    };
+
+    ui->onSkipGroup = [this](int i) -> void {
+        ImageGroup& group = groups.at(i);
+        for (int id : group.ids) {
+            cache->getImage(id)->skipped = true;
+            cache->getImage(id)->saved = false;
+        }
+        group.skippedCount = static_cast<int>(group.ids.size());
+        group.savedCount = 0;
+    };
+
+    ui->onResetGroup = [this](int i) -> void {
+        ImageGroup& group = groups.at(i);
+        for (int id : group.ids) {
+            cache->getImage(id)->skipped = false;
+            cache->getImage(id)->saved = false;
+        }
+        group.skippedCount = 0;
+        group.savedCount = 0;
+    };
+
     previousFrameTime = glfwGetTime();
 }
 

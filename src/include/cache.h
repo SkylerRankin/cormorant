@@ -35,6 +35,7 @@ struct ImageMetadata {
 struct Image {
 	int id = -1;
 	std::string filename;
+	std::string shortFilename;
 	std::string path;
 	glm::ivec2 size;
 	glm::ivec2 previewSize;
@@ -124,6 +125,7 @@ private:
 	const int textureQueueEntriesPerFrame = 1;
 	const glm::ivec2 previewTextureSize{75, 75};
 	const glm::ivec3 previewBackgroundColor{50, 50, 50};
+	const int shortFilenameLength = 16;
 
 	static int nextImageID;
 	unsigned char* previewTextureBackground;
