@@ -1,6 +1,7 @@
 #include <chrono>
 #include <ctime>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include "application.h"
@@ -14,11 +15,12 @@ Application::Application(GLFWwindow* window) : window(window) {
     directoryLoaded.store(false);
 
     // Setup UI callbacks
-    ui->onDirectoryOpened = [this](std::string path) -> void {
+    ui->onDirectoryOpened = [this, window](std::string path) -> void {
         processingState = ProcessingState_LoadingDirectory;
         ui->startLoadingImages();
         cache->initCacheFromDirectory(path, directoryLoaded);
         directoryPath = std::filesystem::path{ path };
+        glfwSetWindowTitle(window, std::format("Cormorant - {}", path.c_str()).c_str());
     };
 
     ui->onGroupSelected = [this](int group) -> void {

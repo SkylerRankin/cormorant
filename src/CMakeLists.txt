@@ -19,6 +19,7 @@ set(CXX_HEADERS
     include/ui.h
     res/fontFA6.h
     res/fontOpenSans.h
+    res/icon64.h
 )
 set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
 

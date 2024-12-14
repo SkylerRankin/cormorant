@@ -1,6 +1,7 @@
 #include <iostream>
 #include "application.h"
 #include "glCommon.h"
+#include "res/icon64.h"
 
 static void errorCallback(int error, const char* description) {
     std::cout << "GLFW error (" << error << "): " << description << std::endl;
@@ -47,11 +48,17 @@ int main() {
         return -1;
     }
 
-    GLFWwindow *window = glfwCreateWindow(1000, 600, "cormorant", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(1000, 600, "Cormorant", NULL, NULL);
     if (!window) {
         glfwTerminate();
         return -1;
     }
+
+    GLFWimage icon;
+    icon.width = 64;
+    icon.height = 64;
+    icon.pixels = icon64EmbeddedImage;
+    glfwSetWindowIcon(window, 1, &icon);
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
