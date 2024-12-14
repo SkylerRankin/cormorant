@@ -36,7 +36,12 @@ set(CXX_SRCS
     ui.cpp
 )
 
-add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS})
+# Resource file
+if (WIN32)
+    set(RESOURCE_FILE res/win.rc)
+endif()
+
+add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS} ${RESOURCE_FILE})
 target_link_libraries(cormorant PRIVATE glad glfw imgui tinyfiledialogs glm stb_image tinyxml2 tinyEXIF)
 
 # Use the Windows subsystem (instead of console) for Windows release builds.
