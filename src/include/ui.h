@@ -21,7 +21,6 @@ enum ControlPanelState {
 enum ViewMode {
     ViewMode_Single = 0,
     ViewMode_ManualCompare = 1,
-    ViewMode_AutoCompare = 2
 };
 
 class UI {
@@ -101,8 +100,8 @@ private:
     // For all relevant image views, update the selected image to the next unskipped image that is not
     // also used by another image view. If there are no more unskipped images, the selected image is
     // set to -1.
-    void goToNextUnskippedImage();
-    void goToPreviousUnskippedImage();
+    void goToNextUnskippedImage(int imageView);
+    void goToPreviousUnskippedImage(int imageView);
 
     void beginControlPanelSection(const char* label);
     void beginSection(const char* label, float padding, float outerWidth);

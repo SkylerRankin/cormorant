@@ -17,11 +17,11 @@ ImageViewer::ImageViewer(const std::map<int, Image>& images) : images(images) {
 		-1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
 	};
 
-	glGenVertexArrays(1, &singleImageRect.vao);
-	glGenBuffers(1, &singleImageRect.vbo);
+	glGenVertexArrays(1, &vao);
+	glGenBuffers(1, &vbo);
 
-	glBindVertexArray(singleImageRect.vao);
-	glBindBuffer(GL_ARRAY_BUFFER, singleImageRect.vbo);
+	glBindVertexArray(vao);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
 
 	int stride = 5;
@@ -207,7 +207,7 @@ void ImageViewer::renderImage() {
 	glActiveTexture(GL_TEXTURE0 + imageTextureUnit);
 	glBindTexture(GL_TEXTURE_2D, image.fullTextureId);
 
-	glBindVertexArray(singleImageRect.vao);
+	glBindVertexArray(vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glActiveTexture(GL_TEXTURE0);
 }

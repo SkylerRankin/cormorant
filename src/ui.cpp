@@ -80,13 +80,31 @@ UI::~UI() {
 }
 
 void UI::inputKey(int key) {
+	if (controlPanelState != ControlPanel_ShowFiles) return;
+
 	if (config.keyToAction.contains(key)) {
 		switch (config.keyToAction.at(key)) {
 		case KeyAction_Next:
-			goToNextUnskippedImage();
+			if (uiState.viewMode == ViewMode_Single) {
+				goToNextUnskippedImage(0);
+			} else if (uiState.viewMode == ViewMode_ManualCompare) {
+				if (mouseOverlappingImage(0)) {
+					goToNextUnskippedImage(0);
+				} else if (mouseOverlappingImage(1)) {
+					goToNextUnskippedImage(1);
+				}
+			}
 			break;
 		case KeyAction_Previous:
-			goToPreviousUnskippedImage();
+			if (uiState.viewMode == ViewMode_Single) {
+				goToPreviousUnskippedImage(0);
+			} else if (uiState.viewMode == ViewMode_ManualCompare) {
+				if (mouseOverlappingImage(0)) {
+					goToPreviousUnskippedImage(0);
+				} else if (mouseOverlappingImage(1)) {
+					goToPreviousUnskippedImage(1);
+				}
+			}
 			break;
 		case KeyAction_Reset:
 			if (mouseOverlappingImage(0)) {
@@ -298,8 +316,6 @@ void UI::renderFrame(double elapsed) {
 		renderSingleImageView();
 	} else if (uiState.viewMode == ViewMode_ManualCompare) {
 		renderCompareImageView();
-	} else if (uiState.viewMode == ViewMode_AutoCompare) {
-		renderCompareImageView();
 	}
 
 	ImGui::EndChild();
@@ -322,15 +338,22 @@ void UI::renderFrame(double elapsed) {
 
 	if (uiState.updateViewMode) {
 		uiState.viewMode = static_cast<ViewMode>(uiState.newViewMode);
-		selectedImages.fill(-1);
 		uiState.updateViewMode = false;
 		uiState.newViewMode = -1;
 
-		// Clear out both image views
-		imageViewer[0]->setImage(-1);
-		imageViewer[1]->setImage(-1);
 		imageViewer[0]->resetTransform();
 		imageViewer[1]->resetTransform();
+
+		if (uiState.viewMode == ViewMode_Single) {
+			// Updated from compare to single, so let left image become the single image automatically.
+			// The right image is deselected.
+			selectedImages[1] = -1;
+		} else if (uiState.viewMode == ViewMode_ManualCompare) {
+			// Updated from single to compare, so the single image becomes the left image automatically.
+			// Select the next non-skipped image for the right image.
+			selectImage(1, selectedImages[0]);
+			goToNextUnskippedImage(1);
+		}
 	}
 
 	// UI updates when leaving a control panel state
@@ -502,12 +525,16 @@ void UI::renderControlPanelGroupsList() {
 			}
 
 			if (ImGui::IsItemClicked()) {
+				controlPanelState = ControlPanel_ShowFiles;
+				uiState.viewMode = ViewMode_Single;
 				selectedGroup = i;
 				onGroupSelected(selectedGroup);
-				controlPanelState = ControlPanel_ShowFiles;
-				selectedImages.fill(-1);
-				selectImage(0, -1);
+
+				// Select first non-skipped image
+				int firstID = groups.at(selectedGroup).ids.at(0);
+				selectImage(0, firstID);
 				selectImage(1, -1);
+				skippedImage();
 			}
 		}
 	}
@@ -540,15 +567,17 @@ void UI::renderControlPanelFiles() {
 	if (ImGui::CollapsingHeader("Options")) {
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, previousWindowPadding);
 
-		const char* viewingModes[] = { "Single Image", "Manual Compare", "Auto Compare" };
+		const char* viewingModes[] = { "Single Image", "Manual Compare" };
 
 		ImGui::SetNextItemWidth(viewModeComboWidth);
 		if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int)uiState.viewMode], 0)) {
-			for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < 2; i++) {
 				const bool selected = i == static_cast<int>(uiState.viewMode);
 				if (ImGui::Selectable(viewingModes[i], selected)) {
-					uiState.updateViewMode = true;
-					uiState.newViewMode = i;
+					if (uiState.viewMode != i) {
+						uiState.updateViewMode = true;
+						uiState.newViewMode = i;
+					}
 				}
 
 				if (selected) {
@@ -672,22 +701,22 @@ void UI::renderControlPanelFiles() {
 				const bool rightSelected = imageID == selectedImages[1];
 
 				if (leftSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-				if (ImGui::Button(std::format("{}##leftCompare", ICON_ARROW_LEFT).c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
-					selectedImages[0] = imageID;
-					selectImage(0, selectedImages[0]);
+				else ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray3);
+				if (ImGui::Button(std::format("##leftCompare").c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
+					selectImage(0, imageID);
 				}
-				if (leftSelected) ImGui::PopStyleColor();
+				ImGui::PopStyleColor();
 
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { compareButtonSpacing, 0});
 				ImGui::SameLine();
 				ImGui::PopStyleVar();
 
 				if (rightSelected) ImGui::PushStyleColor(ImGuiCol_Button, Colors::green);
-				if (ImGui::Button(std::format("{}##rightCompare", ICON_ARROW_RIGHT).c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
-					selectedImages[1] = imageID;
-					selectImage(1, selectedImages[1]);
+				else ImGui::PushStyleColor(ImGuiCol_Button, Colors::gray3);
+				if (ImGui::Button(std::format("##rightCompare").c_str(), ImVec2(compareButtonSize.x, compareButtonSize.y))) {
+					selectImage(1, imageID);
 				}
-				if (rightSelected) ImGui::PopStyleColor();
+				ImGui::PopStyleColor();
 			}
 
 			ImGui::EndTable();
@@ -712,8 +741,7 @@ void UI::renderControlPanelFiles() {
 		}
 
 		if (ImGui::IsItemClicked() && uiState.viewMode == ViewMode_Single) {
-			selectedImages[0] = imageID;
-			selectImage(0, selectedImages[0]);
+			selectImage(0, imageID);
 		}
 	}
 
@@ -916,6 +944,7 @@ void UI::renderPreviewProgress() {
 }
 
 void UI::selectImage(int imageView, int id) {
+	selectedImages[imageView] = id;
 	onImageSelected(id);
 	imageViewer[imageView]->setImage(id);
 	if (uiState.viewMode == ViewMode_Single) {
@@ -943,64 +972,54 @@ void UI::setControlPanelState(ControlPanelState newState) {
 	controlPanelState = newState;
 }
 
-void UI::goToNextUnskippedImage() {
-	if (uiState.viewMode != ViewMode_Single) return;
+void UI::goToNextUnskippedImage(int imageView) {
+	if (imageView > 0 && uiState.viewMode == ViewMode_Single) return;
 
-	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
-		if (imageView > 0 && uiState.viewMode == ViewMode_Single) break;
-
-		// Find index of selected image within the group
-		int index = -1;
-		for (int i = 0; i < groups[selectedGroup].ids.size(); i++) {
-			if (selectedImages[imageView] == groups[selectedGroup].ids[i]) {
-				index = i;
-				break;
-			}
+	// Find index of selected image within the group
+	int index = -1;
+	for (int i = 0; i < groups[selectedGroup].ids.size(); i++) {
+		if (selectedImages[imageView] == groups[selectedGroup].ids[i]) {
+			index = i;
+			break;
 		}
+	}
 
-		if (index == -1) return;
+	if (index == -1) return;
 
-		// Find the next image that is not skipped
-		for (int i = index + 1; i < groups[selectedGroup].ids.size(); i++) {
-			int newImage = groups[selectedGroup].ids[i];
-			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
-			if (!imageCache->getImage(newImage)->skipped) {
-				selectedImages[imageView] = newImage;
-				selectImage(imageView, newImage);
-				uiState.scrollToSelectedFile = true;
-				break;
-			}
+	// Find the next image that is not skipped
+	for (int i = index + 1; i < groups[selectedGroup].ids.size(); i++) {
+		int newImage = groups[selectedGroup].ids[i];
+		if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
+		if (!imageCache->getImage(newImage)->skipped) {
+			selectImage(imageView, newImage);
+			uiState.scrollToSelectedFile = true;
+			break;
 		}
 	}
 }
 
-void UI::goToPreviousUnskippedImage() {
-	if (uiState.viewMode != ViewMode_Single) return;
+void UI::goToPreviousUnskippedImage(int imageView) {
+	if (imageView > 0 && uiState.viewMode == ViewMode_Single) return;
 
-	for (int imageView = 0; imageView < selectedImages.size(); imageView++) {
-		if (imageView > 0 && uiState.viewMode == ViewMode_Single) break;
-
-		// Find index of selected image within the group
-		int index = -1;
-		for (int i = 0; i < groups[selectedGroup].ids.size(); i++) {
-			if (selectedImages[imageView] == groups[selectedGroup].ids[i]) {
-				index = i;
-				break;
-			}
+	// Find index of selected image within the group
+	int index = -1;
+	for (int i = 0; i < groups[selectedGroup].ids.size(); i++) {
+		if (selectedImages[imageView] == groups[selectedGroup].ids[i]) {
+			index = i;
+			break;
 		}
+	}
 
-		if (index == -1) return;
+	if (index == -1) return;
 
-		// Find the previous image that is not skipped
-		for (int i = index - 1; i >= 0; i--) {
-			int newImage = groups[selectedGroup].ids[i];
-			if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
-			if (!imageCache->getImage(newImage)->skipped) {
-				selectedImages[imageView] = newImage;
-				selectImage(imageView, newImage);
-				uiState.scrollToSelectedFile = true;
-				break;
-			}
+	// Find the previous image that is not skipped
+	for (int i = index - 1; i >= 0; i--) {
+		int newImage = groups[selectedGroup].ids[i];
+		if (newImage == selectedImages[0] || newImage == selectedImages[1]) continue;
+		if (!imageCache->getImage(newImage)->skipped) {
+			selectImage(imageView, newImage);
+			uiState.scrollToSelectedFile = true;
+			break;
 		}
 	}
 }
@@ -1027,7 +1046,6 @@ void UI::skippedImage() {
 		for (int i = index + 1; i < groups[selectedGroup].ids.size(); i++) {
 			int newImage = groups[selectedGroup].ids[i];
 			if (!imageCache->getImage(newImage)->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
-				selectedImages[imageView] = newImage;
 				selectImage(imageView, newImage);
 				return;
 			}
@@ -1037,7 +1055,6 @@ void UI::skippedImage() {
 		for (int i = index - 1; i >= 0; i--) {
 			int newImage = groups[selectedGroup].ids[i];
 			if (!imageCache->getImage(groups[selectedGroup].ids[i])->skipped && newImage != selectedImages[0] && newImage != selectedImages[1]) {
-				selectedImages[imageView] = newImage;
 				selectImage(imageView, newImage);
 				return;
 			}
@@ -1045,7 +1062,6 @@ void UI::skippedImage() {
 
 		// No available images
 		int newImage = -1;
-		selectedImages[imageView] = newImage;
 		selectImage(imageView, newImage);
 	}
 }

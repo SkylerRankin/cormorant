@@ -5,13 +5,6 @@
 #include "frame_buffer.h"
 #include "cache.h"
 
-#define u8 unsigned char
-
-struct RectObject {
-	GLuint vao;
-	GLuint vbo;
-};
-
 class ImageViewer {
 public:
 	ImageViewer(const std::map<int, Image>&);
@@ -32,7 +25,7 @@ private:
 
 	const float zoomSpeed = 0.75f;
 	// Unit is %distance per second
-	float zoomLag = 6.0f;
+	float zoomLag = 8.0f;
 	float currentZoom = 0.0f;
 	float targetZoom = 0.0f;
 	bool animatingZoom = false;
@@ -42,7 +35,8 @@ private:
 	GLuint shaderProgram;
 	GLuint imageTextureUnit = 1;
 	int imageID = -1;
-	RectObject singleImageRect;
+	GLuint vao;
+	GLuint vbo;
 
 	void buildShaders();
 	void renderImage();
