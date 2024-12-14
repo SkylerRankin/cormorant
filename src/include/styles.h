@@ -53,6 +53,8 @@ void setGlobalStyles() {
 
 	style.Colors[ImGuiCol_PopupBg] = Colors::gray1;
 
+	style.Colors[ImGuiCol_PlotHistogram] = Colors::green;
+
 	style.ChildRounding = 4.0f;
 	style.FrameRounding = 2.0f;
 }

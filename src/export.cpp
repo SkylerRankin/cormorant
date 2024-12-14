@@ -8,7 +8,7 @@ namespace fs = std::filesystem;
 namespace Export {
     namespace {
         const std::string baseFilename = "saved_images";
-        const std::string extension = ".txt";
+        const std::string textExtension = ".txt";
         const std::string savedDirectoryPostfix = " (saved)";
 
         std::atomic_bool inProgress(false);
@@ -17,7 +17,7 @@ namespace Export {
 
     // Forward declarations
     void threadExportFilenames(fs::path directoryPath, const std::map<int, Image>& images);
-    void threadExportImages(fs::path directoryPath, const std::map<int, Image>& images);
+    void threadExportImages(fs::path directoryPath, const std::map<int, Image>& images, bool copyAllMatchingFiles);
 
     bool exportInProgress() { return inProgress.load(); }
     float exportProgress() { return progress; }
@@ -27,10 +27,10 @@ namespace Export {
         fs::path outputPath;
 
         // Files with same name may already exist, so find the largest number currently used
-        if (fs::exists(fs::path(directoryPath).append(baseFilename + extension))) {
+        if (fs::exists(fs::path(directoryPath).append(baseFilename + textExtension))) {
             int largest = 0;
             std::string prefix = std::format("{} (", baseFilename);
-            std::string postfix = std::format("){}", extension);
+            std::string postfix = std::format("){}", textExtension);
 
             for (const auto& item : fs::directory_iterator{ directoryPath }) {
                 if (!item.is_regular_file()) continue;
@@ -42,9 +42,9 @@ namespace Export {
                     } catch (...) {}
                 }
             }
-            outputPath = fs::path(directoryPath).append(baseFilename + std::format(" ({})", largest + 1) + extension);
+            outputPath = fs::path(directoryPath).append(baseFilename + std::format(" ({})", largest + 1) + textExtension);
         } else {
-            outputPath = fs::path(directoryPath).append(baseFilename + extension);
+            outputPath = fs::path(directoryPath).append(baseFilename + textExtension);
         }
 
         return outputPath;
@@ -61,10 +61,10 @@ namespace Export {
         thread.detach();
     }
 
-    void exportImages(fs::path directory, const std::map<int, Image>& images) {
+    void exportImages(fs::path directory, const std::map<int, Image>& images, bool copyAllMatchingFiles) {
         inProgress.store(true);
         progress = 0.0f;
-        std::thread thread(threadExportImages, directory, images);
+        std::thread thread(threadExportImages, directory, images, copyAllMatchingFiles);
         thread.detach();
     }
 
@@ -96,11 +96,33 @@ namespace Export {
         progress = 1.0f;
     }
 
-    void threadExportImages(fs::path directoryPath, const std::map<int, Image>& images) {
+    void threadExportImages(fs::path directoryPath, const std::map<int, Image>& images, bool copyAllMatchingFiles) {
         fs::path outputPath = imageOutputPath(directoryPath);
 
         if (!fs::exists(outputPath)) {
             fs::create_directory(outputPath);
+        }
+
+        // Generate map from file stem to full filename so that directory search can easily check if
+        // a file has a matching filename in the image set, but is just not the same file.
+        std::map<std::string, std::string> fileStemToFilename;
+        std::map<std::string, std::vector<std::string>> additionalFiles;
+        for (const auto& e : images) {
+            additionalFiles.emplace(e.second.filename, std::vector<std::string>());
+            fileStemToFilename.emplace(fs::path(e.second.path).stem().string(), e.second.filename);
+        }
+
+        if (copyAllMatchingFiles) {
+            for (const auto& entry : fs::directory_iterator{ directoryPath }) {
+                std::string entryPathString{ reinterpret_cast<const char*>(entry.path().u8string().c_str()) };
+                fs::path entryPath{ entryPathString };
+
+                if (fs::is_regular_file(entryPath) &&
+                    fileStemToFilename.contains(entryPath.stem().string()) &&
+                    !additionalFiles.contains(entryPathString)) {
+                    additionalFiles.at(fileStemToFilename.at(entryPath.stem().string())).push_back(entryPathString);
+                }
+            }
         }
 
         int totalSaved = 0;
@@ -109,9 +131,14 @@ namespace Export {
         }
 
         float increment = 1.0f / totalSaved;
-        for (auto& e : images) {
+        for (const auto& e : images) {
             if (e.second.saved) {
                 fs::copy(e.second.path, fs::path(outputPath).append(e.second.filename), fs::copy_options::skip_existing);
+
+                for (const auto& p : additionalFiles.at(e.second.filename)) {
+                    fs::path path = fs::path(p);
+                    fs::copy(path, fs::path(outputPath).append(path.filename().string()), fs::copy_options::skip_existing);
+                }
             }
             progress += increment;
         }

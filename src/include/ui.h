@@ -61,12 +61,14 @@ public:
 private:
     const glm::vec2 previewImageSize{75, 75};
     const float controlPadding = 8.0f;
+    const float tooltipPadding = 4.0f;
     const float controlWidth[3] = { 250.0f, 325.0f, 325.0f };
     const glm::vec2 compareButtonSize{ 30.0f, 30.0f };
     const glm::vec2 exportButtonSize{100, 25};
     const float compareButtonSpacing = 5;
     const float viewModeComboWidth = 150.0f;
     const float rightClickMenuWidth = 150.0f;
+    const float exportTooltipWidth = 250.0f;
 
     const std::vector<ImageGroup>& groups;
     const Config& config;

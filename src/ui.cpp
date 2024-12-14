@@ -235,10 +235,10 @@ void UI::renderFrame(double elapsed) {
 			if (!allowExports) {
 				ImGui::BeginDisabled();
 			}
-			if (ImGui::MenuItem("Copy saved images")) {
+			if (ImGui::MenuItem("Export saved images")) {
 				controlPanelState = ControlPanel_SaveImages;
 			}
-			if (ImGui::MenuItem("Save filenames")) {
+			if (ImGui::MenuItem("Export filenames")) {
 				controlPanelState = ControlPanel_SaveFilenames;
 			}
 			if (!allowExports) {
@@ -392,7 +392,9 @@ void UI::renderControlPanelGroupOptions() {
 		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
 		ImGui::Text("?");
 		ImGui::PopStyleColor();
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tooltipPadding, tooltipPadding));
 		ImGui::SetItemTooltip("Maximum seconds between images within the same group.");
+		ImGui::PopStyleVar();
 		ImGui::Spacing();
 
 		ImGui::TableSetColumnIndex(1);
@@ -409,18 +411,6 @@ void UI::renderControlPanelGroupOptions() {
 		} else if (groupParameters.timeSeconds > 60) {
 			groupParameters.timeSeconds = 60;
 		}
-
-		// Row 1
-		ImGui::TableNextRow();
-		ImGui::TableSetColumnIndex(0);
-		static bool shutterCheck = false;
-		ImGui::Checkbox("Shutter", &shutterCheck);
-		ImGui::Spacing();
-
-		ImGui::TableSetColumnIndex(1);
-		ImGui::SetNextItemWidth(-1);
-		static int shutterSpeed = 10;
-		ImGui::SliderInt("##shutterspeed", &shutterSpeed, 0, 100, "%d sec", 0);
 
 		ImGui::EndTable();
 
@@ -849,8 +839,30 @@ void UI::renderControlPanelSaveImages() {
 
 		ImGui::TextWrapped("Copies all saved images into %s.", outputPath.c_str());
 		ImGui::Spacing();
+
+		static bool copyAllMatching = true;
+		ImGui::Checkbox("Include matching filenames", &copyAllMatching);
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
+		ImGui::Text("?");
+		ImGui::PopStyleColor();
+
+		if (ImGui::IsItemHovered()) {
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tooltipPadding, tooltipPadding));
+			if (ImGui::BeginItemTooltip()) {
+				ImGui::BeginChild("include_matches_popup", ImVec2(exportTooltipWidth, 0), ImGuiChildFlags_AutoResizeY);
+				ImGui::TextWrapped("Along with the saved images, any files with a filename matching a saved image (excluding the extension) will also be copied.");
+				ImGui::TextWrapped("This may be useful for copying raw image files along with the selected jpg versions.");
+				ImGui::EndChild();
+				ImGui::EndTooltip();
+			}
+			ImGui::PopStyleVar();
+		}
+
+		ImGui::Spacing();
+
 		if (ImGui::Button("Save", ImVec2(exportButtonSize.x, exportButtonSize.y))) {
-			Export::exportImages(directoryPath, imageCache->getImages());
+			Export::exportImages(directoryPath, imageCache->getImages(), copyAllMatching);
 			uiState.exportInProgress = true;
 		}
 		ImGui::SameLine();
@@ -983,9 +995,7 @@ void UI::renderPreviewProgress() {
 	ImGui::Text("Loading image information");
 	ImGui::PopStyleColor();
 
-	ImGui::PushStyleColor(ImGuiCol_PlotHistogram, Colors::green);
 	ImGui::ProgressBar(imageCache->getPreviewLoadProgress());
-	ImGui::PopStyleColor();
 
 	ImGui::Spacing();
 	ImGui::Separator();
