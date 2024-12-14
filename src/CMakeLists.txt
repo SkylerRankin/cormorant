@@ -38,3 +38,9 @@ set(CXX_SRCS
 
 add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS})
 target_link_libraries(cormorant PRIVATE glad glfw imgui tinyfiledialogs glm stb_image tinyxml2 tinyEXIF)
+
+# Use the Windows subsystem (instead of console) for Windows release builds.
+if (WIN32)
+    set_target_properties(cormorant PROPERTIES LINK_FLAGS_RELEASE "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS")
+    set_target_properties(cormorant PROPERTIES LINK_FLAGS_MINSIZEREL "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS")
+endif()
