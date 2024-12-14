@@ -107,7 +107,7 @@ void UI::inputKey(int key) {
 			}
 			break;
 		case KeyAction_Reset:
-			if (mouseOverlappingImage(0)) {
+			if (uiState.viewMode == ViewMode_Single || mouseOverlappingImage(0)) {
 				imageViewer[0]->resetTransform();
 				if (uiState.imageViewMovementLocked) {
 					imageViewer[1]->resetTransform();
@@ -120,14 +120,14 @@ void UI::inputKey(int key) {
 			}
 			break;
 		case KeyAction_Save:
-			if (mouseOverlappingImage(0)) {
+			if (uiState.viewMode == ViewMode_Single || mouseOverlappingImage(0)) {
 				onSaveImage(selectedImages[0]);
 			} else if (mouseOverlappingImage(1)) {
 				onSaveImage(selectedImages[1]);
 			}
 			break;
 		case KeyAction_Skip:
-			if (mouseOverlappingImage(0)) {
+			if (uiState.viewMode == ViewMode_Single || mouseOverlappingImage(0)) {
 				onSkipImage(selectedImages[0]);
 			} else if (mouseOverlappingImage(1)) {
 				onSkipImage(selectedImages[1]);
@@ -689,10 +689,12 @@ void UI::renderControlPanelFiles() {
 
 			ImGui::TableSetColumnIndex(1);
 
+			bool setTextColorDisabled = false;
 			if (image->saved) {
 				ImGui::PushStyleColor(ImGuiCol_Text, Colors::green);
-			} else if (image->skipped) {
+			} else if (image->skipped && imageID != selectedImages[0] && imageID != selectedImages[1]) {
 				ImGui::PushStyleColor(ImGuiCol_Text, Colors::textDisabled);
+				setTextColorDisabled = true;
 			}
 
 			ImGui::Text(image->shortFilename.c_str());
@@ -711,7 +713,7 @@ void UI::renderControlPanelFiles() {
 				ImGui::Text("Date unknown");
 			}
 
-			if (image->skipped) {
+			if (setTextColorDisabled) {
 				ImGui::PopStyleColor();
 			}
 
