@@ -62,6 +62,7 @@ into the memory address used by the PBO `pbo`.
 */
 struct ImageQueueEntry {
 	int imageID;
+	int directoryID;
 	unsigned int pbo;
 	void* pboMapping;
 	// True if the image should be loaded in the preview format instead of its full resolution and aspect ratio.
@@ -70,6 +71,7 @@ struct ImageQueueEntry {
 
 struct TextureQueueEntry {
 	int imageID;
+	int directoryID;
 	unsigned int pbo;
 	bool isPreview;
 };
@@ -89,6 +91,12 @@ class ImageCache {
 public:
 	ImageCache();
 	~ImageCache();
+
+	/*
+	Removes all images stored in the cache. Images currently within a queue or on a separate thread won't be
+	deleted, but will be discarded once completed.
+	*/
+	void clear();
 
 	void frameUpdate();
 	// Returns an image, but this image is not updated in the context of the LRU cache.
@@ -127,7 +135,8 @@ private:
 	const glm::ivec3 previewBackgroundColor{50, 50, 50};
 	const int shortFilenameLength = 16;
 
-	static int nextImageID;
+	int nextImageID = 0;
+	int currentDirectoryID = 0;
 	unsigned char* previewTextureBackground;
 	int imageLoadThreads = defaultImageLoadThreads;
 	std::atomic_bool runImageLoadThreads;
@@ -138,7 +147,6 @@ private:
 	std::mutex textureQueueMutex;
 	std::mutex imageQueueConditionVariableMutex;
 	std::condition_variable imageQueueConditionVariable;
-	std::map<unsigned int, GLsync> pboToFence;
 
 	// For debugging
 	std::set<GLuint> textureIds;
@@ -155,7 +163,7 @@ private:
 
 	// PBO queues
 	std::deque<PBOQueueEntry> availablePBOQueue;
-	std::deque<PBOQueueEntry> pendingPBOQueue;
+	std::map<unsigned int, GLsync> pboToFence;
 
 	// LRU linked-list components
 	LRUNode* lruHead = nullptr;

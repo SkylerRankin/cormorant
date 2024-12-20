@@ -12,8 +12,6 @@
 
 namespace fs = std::filesystem;
 
-int ImageCache::nextImageID = 0;
-
 ImageCache::ImageCache() {
 	const int channels = 3;
 	previewTextureBackground = new unsigned char[previewTextureSize.x * previewTextureSize.y * channels];
@@ -50,6 +48,56 @@ ImageCache::ImageCache() {
 ImageCache::~ImageCache() {
 	runImageLoadThreads.store(false);
 	delete[] previewTextureBackground;
+	clear();
+}
+
+void ImageCache::clear() {
+	// Clear the image queue, returning PBOs back to the available pool.
+	{
+		std::lock_guard<std::mutex> guard(imageQueueMutex);
+		for (const auto& entry : imageQueue) {
+			PBOQueueEntry pboEntry{
+				.pbo = entry.pbo,
+				.mappedBuffer = nullptr
+			};
+			availablePBOQueue.push_back(pboEntry);
+		}
+		imageQueue.clear();
+	}
+
+	// Clear the texture queue, returning PBOs back to the available pool.
+	{
+		std::lock_guard<std::mutex> guard(textureQueueMutex);
+		for (const auto& entry : textureQueue) {
+			PBOQueueEntry pboEntry{
+				.pbo = entry.pbo,
+				.mappedBuffer = nullptr
+			};
+			availablePBOQueue.push_back(pboEntry);
+		}
+		textureQueue.clear();
+	}
+
+	for (const auto& entry : images) {
+		glDeleteTextures(1, &entry.second.previewTextureId);
+		glDeleteTextures(1, &entry.second.fullTextureId);
+	}
+	images.clear();
+
+	pendingImageQueue.clear();
+	pboToFence.clear();
+	textureIds.clear();
+	previewsLoaded.clear();
+
+	LRUNode* current = lruHead;
+	while (current) {
+		LRUNode* next = current->next;
+		delete current;
+		current = next;
+	}
+	lruHead = nullptr;
+	lruEnd = nullptr;
+	imageToLRUNode.clear();
 }
 
 void ImageCache::frameUpdate() {
@@ -60,6 +108,7 @@ void ImageCache::frameUpdate() {
 }
 
 void ImageCache::initCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded) {
+	currentDirectoryID++;
 	previewsLoaded.clear();
 	std::thread thread(&ImageCache::threadInitCacheFromDirectory, this, path, std::ref(directoryLoaded));
 	thread.detach();
@@ -89,6 +138,7 @@ void ImageCache::startInitialTextureLoads() {
 	for (auto const& e : images) {
 		ImageQueueEntry entry{
 			.imageID = e.first,
+			.directoryID = currentDirectoryID,
 			.pbo = 0,
 			.pboMapping = nullptr,
 			.isPreview = true
@@ -99,17 +149,14 @@ void ImageCache::startInitialTextureLoads() {
 	// Add enough images for full texture processing to fill cache. The first
 	// n images are arbitrarily chosen.
 	std::vector<int> fullTextureIds;
-	int id = 0;
-	while (id < cacheCapacity && id < images.size()) {
-		fullTextureIds.push_back(id);
-		id++;
+	for (const auto& e : images) {
+		fullTextureIds.push_back(e.first);
+		if (fullTextureIds.size() == cacheCapacity) break;
 	}
 	useImagesFullTextures(fullTextureIds);
 }
 
 void ImageCache::threadInitCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded) {
-	// TODO: clear all previous stored images from memory
-	images.clear();
 	for (const auto& entry : fs::directory_iterator{ fs::path(path) }) {
 		std::string entryPathString{ reinterpret_cast<const char*>(entry.path().u8string().c_str()) };
 		fs::path entryPath{ entryPathString };
@@ -181,6 +228,7 @@ void ImageCache::runImageLoadThread(int threadID) {
 				// Push a texture queue entry back to the main thread for uploading
 				TextureQueueEntry textureQueueEntry{
 					.imageID = imageEntry.imageID,
+					.directoryID = imageEntry.directoryID,
 					.pbo = imageEntry.pbo,
 					.isPreview = imageEntry.isPreview
 				};
@@ -347,16 +395,29 @@ void ImageCache::processTextureQueue() {
 			textureQueue.pop_front();
 		}
 
+		bool skipEntry = false;
+		
+		if (entry.directoryID != currentDirectoryID) {
+			skipEntry = true;
+		}
+
 		Image& image = images.at(entry.imageID);
+		if (!entry.isPreview && (!imageToLRUNode.contains(image.id) || image.imageLoaded)) {
+			if (!imageToLRUNode.contains(image.id)) {
+				image.imageLoaded = false;
+			}
+
+			skipEntry = true;
+		}
 
 		/*
-		If image id is no longer in the LRU list, it must have been evicted in the time
-		that the image data was being read/decoded. The image should not be uploaded in this case.
-		Similarly, if the image is already loaded, there is no need to do an additional upload.
+		There are a few conditions in which the texture entry should be ignored.
+		- If image id is no longer in the LRU list, it must have been evicted in the time that
+		  the image data was being read/decoded (does not apply to previews).
+		- If the image is already loaded, there is no need to do an additional upload.
+		- If the directory ID doesn't match, the entry is leftover from a previous directory.
 		*/
-		if (!entry.isPreview && (!imageToLRUNode.contains(image.id) || image.imageLoaded)) {
-			if (!imageToLRUNode.contains(image.id)) image.imageLoaded = false;
-
+		if (skipEntry) {
 			// Unbind the PBO
 			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
 			glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
@@ -402,20 +463,11 @@ void ImageCache::processTextureQueue() {
 		} else {
 			image.imageLoaded = true;
 		}
-
-		// Move PBO to the pending queue
-		{
-			PBOQueueEntry pboEntry{
-				.pbo = entry.pbo,
-				.mappedBuffer = nullptr
-			};
-			pendingPBOQueue.push_back(pboEntry);
-		}
 	}
 }
 
 void ImageCache::processPendingPBOQueue() {
-	// use sync and fences to move completed pbo transfers back to the available pool
+	// Use sync and fences to move completed pbo transfers back to the available pool
 	for (auto i = pboToFence.cbegin(); i != pboToFence.cend();) {
 		if (glClientWaitSync(i->second, 0, 0)) {
 			// The sync fence is signaled, so PBO is available for reuse
@@ -454,6 +506,7 @@ void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
 	for (int i = 0; i <= maxIndex; i++) {
 		ImageQueueEntry entry{
 			.imageID = ids.at(i),
+			.directoryID = currentDirectoryID,
 			.pbo = 0,
 			.pboMapping = nullptr,
 			.isPreview = false

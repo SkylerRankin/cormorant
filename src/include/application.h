@@ -33,11 +33,11 @@ private:
 	std::vector<ImageGroup> groups;
 	GroupParameters groupParameters;
 	double previousFrameTime;
+	bool directoryOpen = false;
 
 	// Data processing
 	ProcessingState processingState = ProcessingState_None;
 	std::atomic_bool directoryLoaded;
-	std::filesystem::path directoryPath{""};
 
 	// When an image is selected using onImageSelected, the next n and
 	// previous m images are also loaded.

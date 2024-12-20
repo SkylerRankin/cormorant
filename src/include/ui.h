@@ -30,6 +30,7 @@ public:
     void renderFrame(double elapsed);
     int getCurrentGroupIndex() const;
     void setControlPanelState(ControlPanelState newState);
+    void reset();
 
     // Called when the skipped flag on an image is changed. This is required because if the selected image is
     // now skipped, the UI should automatically move to the next unskipped image.
@@ -49,6 +50,7 @@ public:
 
     // Callbacks
     std::function<void(std::string)> onDirectoryOpened;
+    std::function<void()> onDirectoryClosed;
     std::function<void(int)> onGroupSelected;
     std::function<void(int)> onImageSelected;
     std::function<void()> onRegenerateGroups;

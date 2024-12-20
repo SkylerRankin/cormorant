@@ -16,11 +16,24 @@ Application::Application(GLFWwindow* window) : window(window) {
 
     // Setup UI callbacks
     ui->onDirectoryOpened = [this, window](std::string path) -> void {
+        if (directoryOpen) {
+            ui->reset();
+            cache->clear();
+        }
+
         processingState = ProcessingState_LoadingDirectory;
         ui->startLoadingImages();
         cache->initCacheFromDirectory(path, directoryLoaded);
-        directoryPath = std::filesystem::path{ path };
         glfwSetWindowTitle(window, std::format("Cormorant - {}", path.c_str()).c_str());
+        directoryOpen = true;
+    };
+
+    ui->onDirectoryClosed = [this, window]() -> void {
+        processingState = ProcessingState_None;
+        ui->reset();
+        cache->clear();
+        glfwSetWindowTitle(window, "Cormorant");
+        directoryOpen = false;
     };
 
     ui->onGroupSelected = [this](int group) -> void {

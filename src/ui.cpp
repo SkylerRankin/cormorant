@@ -225,10 +225,14 @@ void UI::renderFrame(double elapsed) {
 			if (ImGui::MenuItem("Open")) {
 				uiState.openDirectoryPicker = true;
 			}
-			ImGui::MenuItem("Save");
+			if (ImGui::MenuItem("Close")) {
+				onDirectoryClosed();
+			}
 			ImGui::MenuItem("Settings");
 			ImGui::Separator();
-			ImGui::MenuItem("Exit");
+			if (ImGui::MenuItem("Exit")) {
+				// exit
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Export")) {
@@ -1029,6 +1033,16 @@ int UI::getCurrentGroupIndex() const {
 
 void UI::setControlPanelState(ControlPanelState newState) {
 	controlPanelState = newState;
+}
+
+void UI::reset() {
+	controlPanelState = ControlPanel_NothingLoaded;
+	imageViewer[0]->setImage(-1);
+	imageViewer[1]->setImage(-1);
+	selectedImages.fill(-1);
+	directoryPath.clear();
+	allowGroupInteraction = false;
+	allowExports = false;
 }
 
 void UI::goToNextUnskippedImage(int imageView) {
