@@ -500,6 +500,12 @@ void ImageCache::processPendingPBOQueue() {
 				.pbo = i->first,
 				.mappedBuffer = nullptr
 			};
+
+			// Free the memory used by the PBO
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, entry.pbo);
+			glBufferData(GL_PIXEL_UNPACK_BUFFER, 0, 0, GL_STATIC_DRAW);
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
 			availablePBOQueue.push_back(entry);
 			pboToFence.erase(i++);
 		} else {
