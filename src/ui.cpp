@@ -650,7 +650,7 @@ void UI::renderControlPanelFiles() {
 	}
 
 	ImGui::Text("Group %d", selectedGroup + 1);
-	ImGui::Text("%d saved, %d skipped", groups[selectedGroup].savedCount, groups[selectedGroup].skippedCount);
+	ImGui::Text("%d images, %d saved, %d skipped", groups[selectedGroup].ids.size(), groups[selectedGroup].savedCount, groups[selectedGroup].skippedCount);
 	ImGui::Spacing();
 
 	endSection();
