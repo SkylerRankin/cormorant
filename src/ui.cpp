@@ -235,7 +235,11 @@ void UI::renderFrame(double elapsed) {
 			if (ImGui::MenuItem("Close")) {
 				onDirectoryClosed();
 			}
-			ImGui::MenuItem("Settings");
+			if (ImGui::MenuItem("Settings")) {
+				showSettingsWindow = true;
+				settingsWindowFirstOpen = true;
+				showStatsWindow = false;
+			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Exit")) {
 				// exit
@@ -261,6 +265,7 @@ void UI::renderFrame(double elapsed) {
 			ImGui::MenuItem("About");
 			if (ImGui::MenuItem("Info")) {
 				showStatsWindow = true;
+				showSettingsWindow = false;
 			}
 			ImGui::EndMenu();
 		}
@@ -339,6 +344,7 @@ void UI::renderFrame(double elapsed) {
 	ImGui::PopStyleVar(2);
 
 	if (showStatsWindow) renderStatsWindow();
+	if (showSettingsWindow) renderSettingsWindow();
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -1170,6 +1176,124 @@ void UI::renderStatsWindow() {
 
 	ImGui::End();
 	ImGui::PopStyleColor(5);
+}
+
+void UI::renderSettingsWindow() {
+	ImGui::SetNextWindowPos(ImVec2(
+		ImGui::GetMainViewport()->Size.x / 2.0f - settingsWindowSize.x / 2.0f,
+		ImGui::GetMainViewport()->Size.y / 2.0f - settingsWindowSize.y / 2.0f
+	), ImGuiCond_Appearing);
+
+	ImGui::SetNextWindowSize(ImVec2(settingsWindowSize.x, settingsWindowSize.y), ImGuiCond_Appearing);
+	ImGui::PushStyleColor(ImGuiCol_TitleBg, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_TitleBgActive, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_Border, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_SeparatorActive, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_SeparatorHovered, Colors::greenDark);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 10));
+	ImGui::Begin("Settings", &showSettingsWindow, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse);
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor(5);
+
+	static Config tempConfig;
+
+	if (settingsWindowFirstOpen) {
+		settingsWindowFirstOpen = false;
+
+		tempConfig.cacheCapacity = config.cacheCapacity;
+		tempConfig.cacheForwardPreload = config.cacheForwardPreload;
+		tempConfig.cacheBackwardPreload = config.cacheBackwardPreload;
+	}
+
+	if (ImGui::CollapsingHeader("Cache")) {
+		const int step = 1;
+
+		ImGui::BeginTable("##settings_cache_table", 2, ImGuiTableFlags_None, ImVec2(0.0f, 0.0f));
+
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Cache capacity");
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
+		ImGui::Text("?");
+		ImGui::PopStyleColor();
+		ImGui::SetItemTooltip("Maximum number of images to keep in memory at a time.");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::SetNextItemWidth(-1.0f);
+		ImGui::InputScalar("##cache capacity", ImGuiDataType_U32, &tempConfig.cacheCapacity, &step, nullptr, "%d", ImGuiInputTextFlags_None);
+
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Forward preload");
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
+		ImGui::Text("?");
+		ImGui::PopStyleColor();
+		ImGui::SetItemTooltip("When selecting an image, the number of images after that image to load in addition.");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::SetNextItemWidth(-1.0f);
+		ImGui::InputScalar("##cache_forward_preload", ImGuiDataType_U32, &tempConfig.cacheForwardPreload, &step, nullptr, "%d", ImGuiInputTextFlags_None);
+
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Backward preload");
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, Colors::textHint);
+		ImGui::Text("?");
+		ImGui::PopStyleColor();
+		ImGui::SetItemTooltip("When selecting an image, the number of images before that image to load in addition.");
+		ImGui::TableSetColumnIndex(1);
+		ImGui::SetNextItemWidth(-1.0f);
+		ImGui::InputScalar("##cache_backward_preload", ImGuiDataType_U32, &tempConfig.cacheBackwardPreload, &step, nullptr, "%d", ImGuiInputTextFlags_None);
+	
+		ImGui::EndTable();
+
+		if (ImGui::Button("Save changes")) {
+			onConfigUpdate(tempConfig);
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Key Bindings")) {
+		ImGui::BeginTable("##settings_key_table", 2, ImGuiTableFlags_SizingFixedFit, ImVec2(0.0f, 0.0f));
+
+		const char* keyActions[7] = {
+			"Save image",
+			"Skip image",
+			"Go to next image",
+			"Go to previous image",
+			"Reset image zoom",
+			"Toggle \"Hide skipped images\"",
+			"Toggle \"Lock movement\""
+		};
+		const char* keyBindings[7][4] = {
+			{ "Space", "Enter", "1", nullptr },
+			{ "Backspace", "X", "2", nullptr },
+			{ "Down arrow", "S", nullptr },
+			{ "Up arrow", "W", nullptr },
+			{ "R", "3", nullptr },
+			{ "H", nullptr },
+			{ "L", nullptr }
+		};
+
+		for (int i = 0; i < KeyAction_Count; i++) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text(keyActions[i]);
+			ImGui::TableSetColumnIndex(1);
+			for (int j = 0; j < 4; j++) {
+				if (keyBindings[i][j] == nullptr) break;
+				ImGui::SameLine();
+				ImGui::Button(keyBindings[i][j], ImVec2(100.0f, 0.0f));
+			}
+		}
+
+		ImGui::EndTable();
+
+		ImGui::Text("Note: when viewimg two images, most key bindings apply only to the image under the cursor.");
+	}
+
+	ImGui::End();
 }
 
 void UI::selectImage(int imageView, int id) {

@@ -12,7 +12,7 @@
 
 namespace fs = std::filesystem;
 
-ImageCache::ImageCache() {
+ImageCache::ImageCache(int capacity) : cacheCapacity(capacity) {
 	const int channels = 3;
 	previewTextureBackground = new unsigned char[previewTextureSize.x * previewTextureSize.y * channels];
 	for (int x = 0; x < previewTextureSize.x; x++) {
@@ -90,6 +90,10 @@ void ImageCache::clear() {
 	textureIds.clear();
 	previewsLoaded.clear();
 
+	// Increment current directory id so that any previous queue entries
+	// will be ignore by the current cache state.
+	currentDirectoryID++;
+
 	previewTexturesTotalBytes = 0;
 	fullResolutionTexturesTotalBytes = 0;
 
@@ -109,6 +113,10 @@ void ImageCache::frameUpdate() {
 	processPendingImageQueue();
 	processTextureQueue();
 	assert(textureIds.size() <= cacheCapacity && std::format("Number of in-use textures ({}) has exceeded cache capacity ({}).", textureIds.size(), cacheCapacity).c_str());
+}
+
+void ImageCache::updateCapacity(int capacity) {
+	cacheCapacity = capacity;
 }
 
 void ImageCache::initCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded) {

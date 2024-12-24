@@ -29,6 +29,7 @@ set_source_files_properties(${CXX_HEADERS} PROPERTIES HEADER_FILE_ONLY true)
 set(CXX_SRCS
     application.cpp
     cache.cpp
+    config.cpp
     export.cpp
     frame_buffer.cpp
     glCommon.cpp
@@ -45,7 +46,7 @@ if (WIN32)
 endif()
 
 add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS} ${RESOURCE_FILE})
-target_link_libraries(cormorant PRIVATE glad glfw imgui implot tinyfiledialogs glm stb_image tinyxml2 tinyEXIF)
+target_link_libraries(cormorant PRIVATE glad glfw imgui implot tinyfiledialogs glm stb_image tinyxml2 tinyEXIF whereami)
 
 # Use the Windows subsystem (instead of console) for Windows release builds.
 if (WIN32)

@@ -9,7 +9,11 @@
 #include "ui.h"
 
 Application::Application(GLFWwindow* window) : window(window) {
-    cache = new ImageCache();
+    loadConfig(config);
+    preloadNextImageCount = config.cacheForwardPreload;
+    preloadPreviousImageCount = config.cacheBackwardPreload;
+
+    cache = new ImageCache(config.cacheCapacity);
     monitor = new Monitor();
     ui = new UI(window, config, groups, cache, groupParameters, monitor);
 
@@ -87,6 +91,13 @@ Application::Application(GLFWwindow* window) : window(window) {
         }
         group.skippedCount = 0;
         group.savedCount = 0;
+    };
+
+    ui->onConfigUpdate = [this](Config& updateConfig) -> void {
+        config.update(updateConfig);
+        saveConfig(config);
+        cache->updateCapacity(config.cacheCapacity);
+        ui->onDirectoryClosed();
     };
 
     previousFrameTime = glfwGetTime();

@@ -3,20 +3,21 @@
 #include "glCommon.h"
 
 enum KeyAction {
-	KeyAction_Save,
-	KeyAction_Skip,
-	KeyAction_Next,
-	KeyAction_Previous,
-	KeyAction_Reset,
-	KeyAction_ToggleHideSkipped,
-	KeyAction_ToggleLockMovement
+	KeyAction_Save = 0,
+	KeyAction_Skip = 1,
+	KeyAction_Next = 2,
+	KeyAction_Previous = 3,
+	KeyAction_Reset = 4,
+	KeyAction_ToggleHideSkipped = 5,
+	KeyAction_ToggleLockMovement = 6,
+	KeyAction_Count = 7
 };
 
-/*
-Struct for configurable settings.
-*/
 struct Config {
 	std::map<int, KeyAction> keyToAction{};
+	unsigned int cacheCapacity = 10;
+	unsigned int cacheForwardPreload = 3;
+	unsigned int cacheBackwardPreload = 1;
 
 	Config() {
 		keyToAction.emplace(GLFW_KEY_SPACE, KeyAction_Save);
@@ -40,4 +41,17 @@ struct Config {
 
 		keyToAction.emplace(GLFW_KEY_L, KeyAction_ToggleLockMovement);
 	}
+
+	void update(const Config& source) {
+		for (const auto& e : source.keyToAction) {
+			keyToAction.emplace(e.first, e.second);
+		}
+
+		cacheCapacity = source.cacheCapacity;
+		cacheForwardPreload = source.cacheForwardPreload;
+		cacheBackwardPreload = source.cacheBackwardPreload;
+	}
 };
+
+void loadConfig(Config& config);
+void saveConfig(const Config& config);

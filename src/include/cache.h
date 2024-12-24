@@ -107,7 +107,7 @@ struct ImageCacheUIData {
 
 class ImageCache {
 public:
-	ImageCache();
+	ImageCache(int capacity);
 	~ImageCache();
 
 	/*
@@ -119,6 +119,8 @@ public:
 	void frameUpdate();
 	// Returns an image, but this image is not updated in the context of the LRU cache.
 	Image* getImage(int id);
+	
+	void updateCapacity(int capacity);
 
 	/*
 	For each provided id, move that image to front of LRU list and add it to the image queue
@@ -148,7 +150,7 @@ public:
 
 private:
 	// Max full resolution images to keep stored in GPU at a time
-	const int cacheCapacity = 10;
+	int cacheCapacity;
 	const int defaultImageLoadThreads = 1;
 	const int textureQueueEntriesPerFrame = 1;
 	const glm::ivec2 previewTextureSize{75, 75};

@@ -60,6 +60,7 @@ public:
     std::function<void(int)> onSkipGroup;
     std::function<void(int)> onSaveGroup;
     std::function<void(int)> onResetGroup;
+    std::function<void(Config&)> onConfigUpdate;
 
 private:
     const glm::vec2 previewImageSize{75, 75};
@@ -73,6 +74,7 @@ private:
     const float rightClickMenuWidth = 150.0f;
     const float exportTooltipWidth = 250.0f;
     const glm::vec2 statsWindowSize{400.0f, 300.0f};
+    const glm::vec2 settingsWindowSize{ 600.0f, 300.0f };
 
     const std::vector<ImageGroup>& groups;
     const Config& config;
@@ -88,6 +90,8 @@ private:
     bool allowExports = false;
     bool showPreviewProgress = false;
     bool showStatsWindow = false;
+    bool showSettingsWindow = false;
+    bool settingsWindowFirstOpen = false;
     float previewProgress = 0.0f;
 
     ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
@@ -107,6 +111,7 @@ private:
     void renderImageViewOverlay(int imageView, glm::vec2 position);
     void renderPreviewProgress();
     void renderStatsWindow();
+    void renderSettingsWindow();
 
     void selectImage(int imageView, int id);
     bool mouseOverlappingImage(int imageView);
