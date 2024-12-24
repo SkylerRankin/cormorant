@@ -43,8 +43,8 @@ private:
 
 	// When an image is selected using onImageSelected, the next n and
 	// previous m images are also loaded.
-	const int preloadNextImageCount = 2;
-	const int preloadPreviousImageCount = 1;
+	int preloadNextImageCount = 2;
+	int preloadPreviousImageCount = 1;
 
 	void loadImageWithPreload(int id);
 	void toggleSkipImage(int id);

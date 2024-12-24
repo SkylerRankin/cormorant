@@ -9,7 +9,13 @@
 #include "ui.h"
 
 Application::Application(GLFWwindow* window) : window(window) {
+    loadConfig(config);
+    preloadNextImageCount = config.cacheForwardPreload;
+    preloadPreviousImageCount = config.cacheBackwardPreload;
+
     cache = new ImageCache();
+    cache->updateCapacity(config.cacheCapacity);
+
     monitor = new Monitor();
     ui = new UI(window, config, groups, cache, groupParameters, monitor);
 

@@ -111,6 +111,16 @@ void ImageCache::frameUpdate() {
 	assert(textureIds.size() <= cacheCapacity && std::format("Number of in-use textures ({}) has exceeded cache capacity ({}).", textureIds.size(), cacheCapacity).c_str());
 }
 
+void ImageCache::updateCapacity(int capacity) {
+	if (capacity == cacheCapacity) return;
+	if (capacity < cacheCapacity) {
+		clear();
+	}
+
+	cacheCapacity = capacity;
+}
+
+
 void ImageCache::initCacheFromDirectory(std::string path, std::atomic_bool& directoryLoaded) {
 	currentDirectoryID++;
 	previewsLoaded.clear();

@@ -168,3 +168,21 @@ FetchContent_MakeAvailable(tinyxml2)
 # ------ TinyEXIF ---------------------------------------------------
 
 add_subdirectory(tinyEXIF)
+
+# ------ whereami ---------------------------------------------------
+
+FetchContent_Declare(
+    whereami
+    GIT_REPOSITORY  https://github.com/gpakosz/whereami.git
+    GIT_TAG         dcb52a058dc14530ba9ae05e4339bd3ddfae0e0e
+    GIT_SHALLOW     TRUE
+    GIT_PROGRESS    TRUE
+)
+
+FetchContent_GetProperties(whereami)
+if(NOT whereami)
+    message("Fetching whereami")
+    FetchContent_Populate(whereami)
+    add_library(whereami ${whereami_SOURCE_DIR}/src/whereami.c ${whereami_SOURCE_DIR}/src/whereami.h)
+    target_include_directories(whereami PUBLIC ${whereami_SOURCE_DIR}/src/)
+endif()
