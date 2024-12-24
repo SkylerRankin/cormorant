@@ -1174,10 +1174,19 @@ void UI::renderStatsWindow() {
 
 void UI::selectImage(int imageView, int id) {
 	selectedImages[imageView] = id;
-	onImageSelected(id);
 	imageViewer[imageView]->setImage(id);
+
+	if (id != -1) onImageSelected(id);
+
 	if (uiState.viewMode == ViewMode_Single) {
 		imageViewer[imageView]->resetTransform();
+	} else if (uiState.viewMode == ViewMode_ManualCompare) {
+		// The image in the other view needs to be selected as well to avoid it being
+		// evicted from the cache.
+		int otherView = imageView == 1 ? 0 : 1;
+		if (selectedImages[otherView] != -1) {
+			onImageSelected(selectedImages[otherView]);
+		}
 	}
 }
 

@@ -85,6 +85,7 @@ void ImageCache::clear() {
 	images.clear();
 
 	pendingImageQueue.clear();
+	pendingImageQueueIds.clear();
 	pboToFence.clear();
 	textureIds.clear();
 	previewsLoaded.clear();
@@ -373,6 +374,7 @@ void ImageCache::processPendingImageQueue() {
 
 		ImageQueueEntry imageEntry = pendingImageQueue.front();
 		pendingImageQueue.pop_front();
+		pendingImageQueueIds.erase(imageEntry.imageID);
 		if (
 			(imageEntry.isPreview && images.at(imageEntry.imageID).previewLoaded) ||
 			(!imageEntry.isPreview && images.at(imageEntry.imageID).imageLoaded)) {
@@ -459,7 +461,6 @@ void ImageCache::processTextureQueue() {
 		glm::ivec2& textureSize = entry.isPreview ? image.previewSize : image.size;
 
 		glGenTextures(1, textureID);
-		if (!entry.isPreview) textureIds.insert(*textureID);
 		glBindTexture(GL_TEXTURE_2D, *textureID);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -486,6 +487,7 @@ void ImageCache::processTextureQueue() {
 			previewTexturesTotalBytes += totalBytes;
 		} else {
 			image.imageLoaded = true;
+			textureIds.insert(*textureID);
 			fullResolutionTexturesTotalBytes += totalBytes;
 		}
 	}
@@ -526,39 +528,66 @@ void ImageCache::useImageFullTexture(int id) {
 	useImagesFullTextures(ids);
 }
 
-void ImageCache::useImagesFullTextures(std::vector<int>& ids) {
-	// No point in pushing more items to the queue than the cache has capacity, since
-	// this will just result in evicting stuff that was just added.
-	size_t maxIndex = ids.size() - 1;
-	if (ids.size() > cacheCapacity) {
-		maxIndex = cacheCapacity - 1;
+void ImageCache::useImagesFullTextures(std::vector<int>& allIds) {
+	// Reduce the number of image ids to add to a set that is <= the cache capacity. Any more
+	// will result in the last images in the list evicting the first images in the list.
+	std::set<int> ids;
+	for (int i = 0; i < allIds.size() && ids.size() < cacheCapacity; i++) {
+		ids.insert(allIds.at(i));
 	}
 
-	for (int i = 0; i <= maxIndex; i++) {
+	for (int id : ids) {
+		// Skip pushing IDs that are already in the queue.
+		if (pendingImageQueueIds.contains(id)) {
+			continue;
+		}
+
 		ImageQueueEntry entry{
-			.imageID = ids.at(i),
+			.imageID = id,
 			.directoryID = currentDirectoryID,
 			.pbo = 0,
 			.pboMapping = nullptr,
 			.isPreview = false
 		};
-
 		pendingImageQueue.push_back(entry);
+		pendingImageQueueIds.insert(entry.imageID);
+	}
+
+	// If the pending image queue is larger than the cache capacity, images early in the queue will
+	// always be evicted as images later in the queue eventually get processed. To prevent that wasted
+	// time, enough images early in the queue are deleted such that all images in the queue will actually
+	// be kept in the cache.
+	if (previewLoadingComplete() && pendingImageQueue.size() > cacheCapacity) {
+		int entriesToDelete = static_cast<int>(pendingImageQueue.size()) - cacheCapacity;
+		int entriesDeleted = 0;
+
+		int i = 0;
+		while (i < pendingImageQueue.size() && entriesDeleted < entriesToDelete) {
+			ImageQueueEntry entry = pendingImageQueue.at(i);
+			if (ids.contains(entry.imageID)) {
+				// Don't delete images that are being requested by this function call. They may already
+				// exist at early positions in the queue.
+				i++;
+			} else {
+				pendingImageQueue.erase(pendingImageQueue.cbegin() + i);
+				pendingImageQueueIds.erase(entry.imageID);
+				deleteImage(entry.imageID);
+				entriesDeleted++;
+			}
+		}
 	}
 
 	// First, find any ids that are already loaded and in the LRU list. Mark these
 	// images as used so they move up in the list and won't be considered for eviction
 	// unnecessarily.
-	for (int i = 0; i <= maxIndex; i++) {
-		int id = ids.at(i);
+	for (int id : ids) {
 		if (imageToLRUNode.contains(id)) {
 			useLRUNode(imageToLRUNode.at(id));
 		}
 	}
 
 	// Second, add any new ids to the list, evicting the oldest when space is needed.
-	for (int i = 0; i <= maxIndex; i++) {
-		int id = ids.at(i);
+	for (int id : ids) {
 		if (!imageToLRUNode.contains(id)) {
 			if (imageToLRUNode.size() == cacheCapacity) {
 				evictOldestImage();
@@ -617,26 +646,53 @@ void ImageCache::evictOldestImage() {
 	}
 
 	int removedID = lruHead->imageID;
+	deleteImage(removedID);
+}
+
+void ImageCache::deleteImage(int id) {
 	// TODO: probably not thread safe, should lock when modifying images map
-	Image& image = images.at(removedID);
-	image.imageLoaded = false;
-	glDeleteTextures(1, &image.fullTextureId);
-	textureIds.erase(image.fullTextureId);
+	Image& image = images.at(id);
 
-	fullResolutionTexturesTotalBytes -= static_cast<u64>(image.size.x) * static_cast<u64>(image.size.y) * 3ULL;
-
-	imageToLRUNode.erase(removedID);
-
-	LRUNode* originalHead = lruHead;
-	if (lruHead == lruEnd) {
-		lruHead = nullptr;
-		lruEnd = nullptr;
-	} else {
-		lruHead = lruHead->next;
-		lruHead->prev = nullptr;
+	if (image.imageLoaded) {
+		image.imageLoaded = false;
+		glDeleteTextures(1, &image.fullTextureId);
+		textureIds.erase(image.fullTextureId);
+		fullResolutionTexturesTotalBytes -= static_cast<u64>(image.size.x) * static_cast<u64>(image.size.y) * 3ULL;
 	}
 
-	delete originalHead;
+	imageToLRUNode.erase(id);
+
+	assert(lruHead && "Attempted to delete from empty LRU list.");
+
+	if (lruHead->imageID == id) {
+		// Deleting head of list
+		LRUNode* originalHead = lruHead;
+		if (lruHead == lruEnd) {
+			lruHead = nullptr;
+			lruEnd = nullptr;
+		} else {
+			lruHead = lruHead->next;
+			lruHead->prev = nullptr;
+		}
+		delete originalHead;
+	} else if (lruEnd->imageID == id) {
+		// Deleting end of list
+		LRUNode* node = lruEnd;
+		lruEnd = lruEnd->prev;
+		lruEnd->next = nullptr;
+		delete node;
+	} else {
+		LRUNode* current = lruHead;
+		while (current) {
+			if (current->imageID == id) break;
+			current = current->next;
+		}
+
+		assert(current && current->imageID == id && "Attempted to delete image, but not found in LRU list.");
+		current->prev->next = current->next;
+		current->next->prev = current->prev;
+		delete current;
+	}
 }
 
 ImageTimestamp ImageCache::parseEXIFTimestamp(std::string text) {

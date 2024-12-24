@@ -182,6 +182,7 @@ private:
 	// Entries are only popped from this queue once they can be paired with an available
 	// PBO, and moved into the imageQueue accessible by the image loading threads.
 	std::deque<ImageQueueEntry> pendingImageQueue;
+	std::set<int> pendingImageQueueIds;
 
 	// PBO queues
 	std::deque<PBOQueueEntry> availablePBOQueue;
@@ -195,6 +196,9 @@ private:
 	// LRU interaction functions
 	void useLRUNode(LRUNode* node);
 	void addLRUNode(int id);
+	// Removes the full resolution data for an image and removes it from the LRU list. The
+	// remaining image data is not deleted.
+	void deleteImage(int id);
 	void evictOldestImage();
 
 	void startImageLoadingThreads();

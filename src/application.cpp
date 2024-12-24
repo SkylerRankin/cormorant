@@ -176,14 +176,22 @@ void Application::loadImageWithPreload(int id) {
         std::vector<int> imageIDs;
         imageIDs.push_back(id);
 
-        for (int i = 1; i <= preloadNextImageCount; i++) {
-            if (indexInGroup + i >= group.size()) break;
-            imageIDs.push_back(group.at(indexInGroup + i));
+        int count = 0;
+        for (int i = indexInGroup + 1; i < group.size() && count < preloadNextImageCount; i++) {
+            int preloadID = group.at(i);
+            if (!images.at(preloadID).skipped) {
+                imageIDs.push_back(preloadID);
+                count++;
+            }
         }
 
-        for (int i = 1; i <= preloadPreviousImageCount; i++) {
-            if (indexInGroup - i < 0) break;
-            imageIDs.push_back(group.at(indexInGroup - i));
+        count = 0;
+        for (int i = indexInGroup - 1; i >= 0 && count < preloadPreviousImageCount; i--) {
+            int preloadID = group.at(i);
+            if (!images.at(preloadID).skipped) {
+                imageIDs.push_back(preloadID);
+                count++;
+            }
         }
 
         cache->useImagesFullTextures(imageIDs);
