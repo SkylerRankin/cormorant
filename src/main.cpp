@@ -78,5 +78,6 @@ int main() {
     }
     
     glfwTerminate();
+    glfwSetErrorCallback(nullptr);
     return 0;
 }
