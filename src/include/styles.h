@@ -45,11 +45,6 @@ void setGlobalStyles() {
 	style.Colors[ImGuiCol_SliderGrab] = Colors::gray5;
 	style.Colors[ImGuiCol_SliderGrabActive] = Colors::gray5;
 
-	// Applies to the resizable borders within dockspaces
-	style.Colors[ImGuiCol_ResizeGrip] = Colors::gray2;
-	style.Colors[ImGuiCol_ResizeGripHovered] = Colors::gray3;
-	style.Colors[ImGuiCol_ResizeGripActive] = Colors::gray3;
-
 	style.Colors[ImGuiCol_ScrollbarBg] = Colors::gray1;
 
 	style.Colors[ImGuiCol_PopupBg] = Colors::gray1;

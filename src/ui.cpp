@@ -56,7 +56,6 @@ UI::UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& 
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
 
@@ -1057,7 +1056,7 @@ void UI::renderStatsWindow() {
 	ImGui::PushStyleColor(ImGuiCol_SeparatorActive, Colors::greenDark);
 	ImGui::PushStyleColor(ImGuiCol_SeparatorHovered, Colors::greenDark);
 
-	ImGui::Begin("Infomation", &showStatsWindow, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse);
+	ImGui::Begin("Infomation", &showStatsWindow, ImGuiWindowFlags_NoCollapse);
 
 	ImGui::Text("Cormorant v%s", VERSION);
 
@@ -1210,7 +1209,7 @@ void UI::renderSettingsWindow() {
 	ImGui::PushStyleColor(ImGuiCol_SeparatorHovered, Colors::greenDark);
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 10));
-	ImGui::Begin("Settings", &showSettingsWindow, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse);
+	ImGui::Begin("Settings", &showSettingsWindow, ImGuiWindowFlags_NoCollapse);
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor(5);
 
