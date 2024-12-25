@@ -78,6 +78,9 @@ int main() {
     }
     
     glfwTerminate();
+#ifndef NDEBUG
     glfwSetErrorCallback(nullptr);
+#endif
+
     return 0;
 }

@@ -47,6 +47,7 @@ ImageCache::ImageCache(int capacity) : cacheCapacity(capacity) {
 
 ImageCache::~ImageCache() {
 	runImageLoadThreads.store(false);
+	imageQueueConditionVariable.notify_all();
 	delete[] previewTextureBackground;
 	clear();
 }
