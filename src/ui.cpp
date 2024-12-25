@@ -19,6 +19,7 @@
 namespace {
 	struct InputState {
 		bool leftClickDown = false;
+		double lastClickTime = 0;
 		bool panningImage = false;
 		int mouseActiveImage = -1;
 		glm::ivec2 prevMousePosition{};
@@ -160,10 +161,27 @@ void UI::inputClick(int button, int action, int mods) {
 	if (button == GLFW_MOUSE_BUTTON_LEFT) {
 		if (action == GLFW_PRESS) {
 			inputState.leftClickDown = true;
+			double elapsed = glfwGetTime() - inputState.lastClickTime;
 			double mouseX, mouseY;
 			glfwGetCursorPos(window, &mouseX, &mouseY);
+
+			if (elapsed <= doubleClickSeconds && mouseX == inputState.leftClickStart.x && mouseY == inputState.leftClickStart.y) {
+				if (mouseOverlappingImage(0)) {
+					imageViewer[0]->resetTransform();
+					if (uiState.viewMode == ViewMode_ManualCompare && uiState.imageViewMovementLocked) {
+						imageViewer[1]->resetTransform();
+					}
+				} else if (mouseOverlappingImage(1)) {
+					imageViewer[1]->resetTransform();
+					if (uiState.viewMode == ViewMode_ManualCompare && uiState.imageViewMovementLocked) {
+						imageViewer[0]->resetTransform();
+					}
+				}
+			}
+
 			inputState.leftClickStart = glm::ivec2(mouseX, mouseY);
 			inputState.prevMousePosition = glm::ivec2(mouseX, mouseY);
+			inputState.lastClickTime = glfwGetTime();
 
 			bool overlaps[2] = {
 				mouseOverlappingImage(0),

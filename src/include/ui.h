@@ -75,6 +75,7 @@ private:
     const float exportTooltipWidth = 250.0f;
     const glm::vec2 statsWindowSize{400.0f, 300.0f};
     const glm::vec2 settingsWindowSize{ 600.0f, 300.0f };
+    const float doubleClickSeconds = 0.25f;
 
     const std::vector<ImageGroup>& groups;
     const Config& config;
