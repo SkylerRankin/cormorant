@@ -152,6 +152,8 @@ void UI::inputKey(int key) {
 				}
 			}
 			break;
+		case Config::KeyAction_Count:
+			break;
 		}
 	}
 }
@@ -405,12 +407,8 @@ void UI::renderFrame(double elapsed) {
 
 	// UI updates when leaving a control panel state
 	if (prevControlPanelState != controlPanelState) {
-		switch (prevControlPanelState) {
-		case ControlPanel_ShowFiles:
+		if (prevControlPanelState == ControlPanel_ShowFiles) {
 			uiState.scrollToTopOfFiles = true;
-			break;
-		case ControlPanel_ShowGroups:
-			break;
 		}
 	}
 }
@@ -484,7 +482,7 @@ void UI::renderControlPanelGroupOptions() {
 	if (groups.size() == 1) {
 		ImGui::Text("1 Group");
 	} else {
-		ImGui::Text("%d Groups", groups.size());
+		ImGui::Text("%zu Groups", groups.size());
 	}
 
 	int countGroupsWithNoSaves = 0;
@@ -534,7 +532,7 @@ void UI::renderControlPanelGroupsList() {
 			ImGui::TableSetColumnIndex(1);
 			ImGui::Text("Group %d", i + 1);
 			ImGui::Separator();
-			ImGui::Text("%d image%s", groups[i].ids.size(), groups[i].ids.size() == 1 ? "" : "s");
+			ImGui::Text("%zu image%s", groups[i].ids.size(), groups[i].ids.size() == 1 ? "" : "s");
 
 			if (groups[i].skippedCount == groups[i].ids.size()) {
 				ImGui::Text("All images skipped");
@@ -679,7 +677,7 @@ void UI::renderControlPanelFiles() {
 	}
 
 	ImGui::Text("Group %d", selectedGroup + 1);
-	ImGui::Text("%d images, %d saved, %d skipped", groups[selectedGroup].ids.size(), groups[selectedGroup].savedCount, groups[selectedGroup].skippedCount);
+	ImGui::Text("%zu images, %d saved, %d skipped", groups[selectedGroup].ids.size(), groups[selectedGroup].savedCount, groups[selectedGroup].skippedCount);
 	ImGui::Spacing();
 
 	endSection();
@@ -734,7 +732,7 @@ void UI::renderControlPanelFiles() {
 				setTextColorDisabled = true;
 			}
 
-			ImGui::Text(image->shortFilename.c_str());
+			ImGui::Text("%s", image->shortFilename.c_str());
 
 			if (image->saved) {
 				ImGui::PopStyleColor();
@@ -745,7 +743,7 @@ void UI::renderControlPanelFiles() {
 
 			if (image->metadata.timestamp.has_value()) {
 				ImageTimestamp t = image->metadata.timestamp.value();
-				ImGui::Text(std::format("{}:{:0>2} {}/{}/{}", t.hour, t.minute, t.month, t.day, t.year).c_str());
+				ImGui::Text("%s", std::format("{}:{:0>2} {}/{}/{}", t.hour, t.minute, t.month, t.day, t.year).c_str());
 			} else {
 				ImGui::Text("Date unknown");
 			}
@@ -794,7 +792,7 @@ void UI::renderControlPanelFiles() {
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, Colors::gray1);
 		if (ImGui::BeginPopupContextItem()) {
 			ImGui::BeginChild(std::format("file popup {}", imageID).c_str(), ImVec2(rightClickMenuWidth, 0), ImGuiChildFlags_AutoResizeY);
-			ImGui::TextWrapped(image->filename.c_str());
+			ImGui::TextWrapped("%s", image->filename.c_str());
 			ImGui::Separator();
 			if (ImGui::Selectable(image->saved ? "Undo save" : "Save")) {
 				onSaveImage(imageID);
@@ -1070,7 +1068,7 @@ void UI::renderStatsWindow() {
 		const unsigned char* version = glGetString(GL_VERSION);
 		uiState.glVersionString = std::format("OpenGL Version {}", reinterpret_cast<const char*>(version));
 	}
-	ImGui::Text(uiState.glVersionString.c_str());
+	ImGui::Text("%s", uiState.glVersionString.c_str());
 
 	ImGui::Spacing();
 
@@ -1100,13 +1098,13 @@ void UI::renderStatsWindow() {
 		ImGui::Text("Moving average");
 		ImGui::TableSetColumnIndex(1);
 		double ms = monitor->frameTimeAverage;
-		ImGui::Text(std::format("{:.4f} s, {:.0f} FPS", ms, 1 / ms).c_str());
+		ImGui::Text("%s", std::format("{:.4f} s, {:.0f} FPS", ms, 1 / ms).c_str());
 
 		ImGui::TableNextRow();
 		ImGui::TableSetColumnIndex(0);
 		ImGui::Text("1k Frame Peak");
 		ImGui::TableSetColumnIndex(1);
-		ImGui::Text(std::format("{:.4f} s", maxFrameTime).c_str());
+		ImGui::Text("%s", std::format("{:.4f} s", maxFrameTime).c_str());
 		ImGui::EndTable();
 
 		if (ImPlot::BeginPlot("##frametime_plot", ImVec2(-1, 100), ImPlotFlags_CanvasOnly | ImPlotFlags_NoInputs | ImPlotFlags_NoChild)) {
@@ -1137,7 +1135,7 @@ void UI::renderStatsWindow() {
 		ImGui::TableSetColumnIndex(0);
 		ImGui::Text("Estimated size");
 		ImGui::TableSetColumnIndex(1);
-		ImGui::Text(bytesToSizeString(cacheData.estimatedPreviewBytes).c_str());
+		ImGui::Text("%s", bytesToSizeString(cacheData.estimatedPreviewBytes).c_str());
 		ImGui::EndTable();
 
 		ImGui::Unindent();
@@ -1159,7 +1157,7 @@ void UI::renderStatsWindow() {
 		ImGui::TableSetColumnIndex(0);
 		ImGui::Text("Estimated size");
 		ImGui::TableSetColumnIndex(1);
-		ImGui::Text(bytesToSizeString(cacheData.estimatedFullTextureBytes).c_str());
+		ImGui::Text("%s", bytesToSizeString(cacheData.estimatedFullTextureBytes).c_str());
 		ImGui::EndTable();
 
 		ImGui::Unindent();
@@ -1189,7 +1187,7 @@ void UI::renderStatsWindow() {
 		for (int i = 0; i < 6; i++) {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::Text(rowLabels[i]);
+			ImGui::Text("%s", rowLabels[i]);
 			ImGui::TableSetColumnIndex(1);
 			ImGui::Text("%d", rowValues[i]);
 		}
@@ -1302,7 +1300,7 @@ void UI::renderSettingsWindow() {
 		for (int i = 0; i < Config::KeyAction_Count; i++) {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::Text(keyActions[i]);
+			ImGui::Text("%s", keyActions[i]);
 			ImGui::TableSetColumnIndex(1);
 			for (int j = 0; j < 4; j++) {
 				if (keyBindings[i][j] == nullptr) break;

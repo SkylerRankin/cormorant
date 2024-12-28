@@ -309,7 +309,7 @@ void ImageViewer::clampPanToEdges() {
 }
 
 void ImageViewer::updateZoom(double elapsed) {
-	if (abs(currentZoom - targetZoom) <= 0.01f) {
+	if (std::abs(currentZoom - targetZoom) <= 0.01f) {
 		currentZoom = targetZoom;
 		animatingZoom = false;
 	} else {

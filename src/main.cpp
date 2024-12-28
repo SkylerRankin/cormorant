@@ -64,6 +64,7 @@ int main() {
     glfwSetCursorPosCallback(window, &mousePositionCallback);
     glfwSetScrollCallback(window, &scrollCallback);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+    glfwSwapInterval(1);
 
 #ifndef NDEBUG
     glfwSetErrorCallback(errorCallback);

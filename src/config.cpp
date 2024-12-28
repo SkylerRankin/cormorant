@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <whereami.h>
 #include "config.h"
 #include "version.h"

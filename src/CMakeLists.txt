@@ -3,8 +3,6 @@ project(cormorant LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(include)
-
 # Header files
 set(CXX_HEADERS
     include/application.h
@@ -47,6 +45,8 @@ endif()
 
 add_executable(cormorant ${CXX_SRCS} ${CXX_HEADERS} ${RESOURCE_FILE})
 target_link_libraries(cormorant PRIVATE glad glfw imgui implot tinyfiledialogs glm stb_image tinyxml2 tinyEXIF whereami)
+target_include_directories(cormorant PRIVATE include)
+target_include_directories(cormorant PRIVATE res)
 
 # Use the Windows subsystem (instead of console) for Windows release builds.
 if (WIN32)
