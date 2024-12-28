@@ -1,5 +1,5 @@
-#include <iostream>
 #include <format>
+#include <iostream>
 #include <set>
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -8,12 +8,12 @@
 #include "implot.h"
 #include <tinyfiledialogs.h>
 #include "export.h"
-#include "imageView.h"
 #include "glCommon.h"
-#include "styles.h"
-#include "ui.h"
+#include "imageView.h"
 #include "res/fontFA6.h"
 #include "res/fontOpenSans.h"
+#include "styles.h"
+#include "ui.h"
 #include "version.h"
 
 namespace {
@@ -48,7 +48,7 @@ namespace {
 	std::string bytesToSizeString(unsigned long long bytes);
 }
 
-UI::UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters, Monitor* monitor)
+UI::UI(GLFWwindow* window, const Config::Config& config, const std::vector<Group::ImageGroup>& groups, ImageCache* imageCache, Group::GroupParameters& groupParameters, Monitor* monitor)
 	: window(window), config(config), imageTargetSize(glm::ivec2(1, 1)), groups(groups), imageCache(imageCache), groupParameters(groupParameters), monitor(monitor) {
 	IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -91,7 +91,7 @@ void UI::inputKey(int key) {
 
 	if (config.keyToAction.contains(key)) {
 		switch (config.keyToAction.at(key)) {
-		case KeyAction_Next:
+		case Config::KeyAction_Next:
 			if (uiState.viewMode == ViewMode_Single) {
 				goToNextUnskippedImage(0);
 			} else if (uiState.viewMode == ViewMode_ManualCompare) {
@@ -102,7 +102,7 @@ void UI::inputKey(int key) {
 				}
 			}
 			break;
-		case KeyAction_Previous:
+		case Config::KeyAction_Previous:
 			if (uiState.viewMode == ViewMode_Single) {
 				goToPreviousUnskippedImage(0);
 			} else if (uiState.viewMode == ViewMode_ManualCompare) {
@@ -113,7 +113,7 @@ void UI::inputKey(int key) {
 				}
 			}
 			break;
-		case KeyAction_Reset:
+		case Config::KeyAction_Reset:
 			if (uiState.viewMode == ViewMode_Single || mouseOverlappingImage(0)) {
 				imageViewer[0]->resetTransform();
 				if (uiState.imageViewMovementLocked) {
@@ -126,24 +126,24 @@ void UI::inputKey(int key) {
 				}
 			}
 			break;
-		case KeyAction_Save:
+		case Config::KeyAction_Save:
 			if (uiState.viewMode == ViewMode_Single || mouseOverlappingImage(0)) {
 				onSaveImage(selectedImages[0]);
 			} else if (mouseOverlappingImage(1)) {
 				onSaveImage(selectedImages[1]);
 			}
 			break;
-		case KeyAction_Skip:
+		case Config::KeyAction_Skip:
 			if (uiState.viewMode == ViewMode_Single || mouseOverlappingImage(0)) {
 				onSkipImage(selectedImages[0]);
 			} else if (mouseOverlappingImage(1)) {
 				onSkipImage(selectedImages[1]);
 			}
 			break;
-		case KeyAction_ToggleHideSkipped:
+		case Config::KeyAction_ToggleHideSkipped:
 			uiState.hideSkippedImages = !uiState.hideSkippedImages;
 			break;
-		case KeyAction_ToggleLockMovement:
+		case Config::KeyAction_ToggleLockMovement:
 			if (uiState.viewMode == ViewMode_ManualCompare) {
 				uiState.imageViewMovementLocked = !uiState.imageViewMovementLocked;
 				if (uiState.imageViewMovementLocked) {
@@ -279,7 +279,12 @@ void UI::renderFrame(double elapsed) {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Help")) {
-			ImGui::MenuItem("About");
+			if (ImGui::MenuItem("About")) {
+				showAboutWindow = true;
+				showSettingsWindow = false;
+				settingsWindowFirstOpen = false;
+				showStatsWindow = false;
+			}
 			if (ImGui::MenuItem("Info")) {
 				showStatsWindow = true;
 				showSettingsWindow = false;
@@ -362,6 +367,7 @@ void UI::renderFrame(double elapsed) {
 
 	if (showStatsWindow) renderStatsWindow();
 	if (showSettingsWindow) renderSettingsWindow();
+	if (showAboutWindow) renderAboutWindow();
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -482,7 +488,7 @@ void UI::renderControlPanelGroupOptions() {
 	}
 
 	int countGroupsWithNoSaves = 0;
-	for (const ImageGroup& group : groups) {
+	for (auto& group : groups) {
 		if (group.savedCount == 0 && group.skippedCount < group.ids.size()) {
 			countGroupsWithNoSaves++;
 		}
@@ -1213,7 +1219,7 @@ void UI::renderSettingsWindow() {
 	ImGui::PopStyleVar();
 	ImGui::PopStyleColor(5);
 
-	static Config tempConfig;
+	static Config::Config tempConfig;
 
 	if (settingsWindowFirstOpen) {
 		settingsWindowFirstOpen = false;
@@ -1293,7 +1299,7 @@ void UI::renderSettingsWindow() {
 			{ "L", nullptr }
 		};
 
-		for (int i = 0; i < KeyAction_Count; i++) {
+		for (int i = 0; i < Config::KeyAction_Count; i++) {
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text(keyActions[i]);
@@ -1309,6 +1315,30 @@ void UI::renderSettingsWindow() {
 
 		ImGui::Text("Note: when viewimg two images, most key bindings apply only to the image under the cursor.");
 	}
+
+	ImGui::End();
+}
+
+void UI::renderAboutWindow() {
+	ImGui::SetNextWindowPos(ImVec2(
+		ImGui::GetMainViewport()->Size.x / 2.0f - aboutWindowSize.x / 2.0f,
+		ImGui::GetMainViewport()->Size.y / 2.0f - aboutWindowSize.y / 2.0f
+	), ImGuiCond_Appearing);
+
+	ImGui::SetNextWindowSize(ImVec2(aboutWindowSize.x, aboutWindowSize.y), ImGuiCond_Appearing);
+	ImGui::PushStyleColor(ImGuiCol_TitleBg, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_TitleBgActive, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_Border, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_SeparatorActive, Colors::greenDark);
+	ImGui::PushStyleColor(ImGuiCol_SeparatorHovered, Colors::greenDark);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 10));
+	ImGui::Begin("About", &showAboutWindow, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor(5);
+
+	ImGui::Text("Cormorant v%s", VERSION);
+	ImGui::Text("https://github.com/SkylerRankin/cormorant");
 
 	ImGui::End();
 }

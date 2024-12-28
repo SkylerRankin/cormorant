@@ -1,15 +1,10 @@
-#include <chrono>
-#include <ctime>
-#include <filesystem>
 #include <format>
-#include <fstream>
-#include <iostream>
 #include "application.h"
 #include "cache.h"
 #include "ui.h"
 
 Application::Application(GLFWwindow* window) : window(window) {
-    loadConfig(config);
+    Config::loadConfig(config);
     preloadNextImageCount = config.cacheForwardPreload;
     preloadPreviousImageCount = config.cacheBackwardPreload;
 
@@ -64,7 +59,7 @@ Application::Application(GLFWwindow* window) : window(window) {
     };
 
     ui->onSaveGroup = [this](int i) -> void {
-        ImageGroup& group = groups.at(i);
+        auto& group = groups.at(i);
         for (int id : group.ids) {
             cache->getImage(id)->saved = true;
             cache->getImage(id)->skipped = false;
@@ -74,7 +69,7 @@ Application::Application(GLFWwindow* window) : window(window) {
     };
 
     ui->onSkipGroup = [this](int i) -> void {
-        ImageGroup& group = groups.at(i);
+        auto& group = groups.at(i);
         for (int id : group.ids) {
             cache->getImage(id)->skipped = true;
             cache->getImage(id)->saved = false;
@@ -84,7 +79,7 @@ Application::Application(GLFWwindow* window) : window(window) {
     };
 
     ui->onResetGroup = [this](int i) -> void {
-        ImageGroup& group = groups.at(i);
+        auto& group = groups.at(i);
         for (int id : group.ids) {
             cache->getImage(id)->skipped = false;
             cache->getImage(id)->saved = false;
@@ -93,9 +88,9 @@ Application::Application(GLFWwindow* window) : window(window) {
         group.savedCount = 0;
     };
 
-    ui->onConfigUpdate = [this](Config& updateConfig) -> void {
+    ui->onConfigUpdate = [this](Config::Config& updateConfig) -> void {
         config.update(updateConfig);
-        saveConfig(config);
+        Config::saveConfig(config);
         cache->updateCapacity(config.cacheCapacity);
         ui->onDirectoryClosed();
     };
@@ -213,7 +208,7 @@ void Application::toggleSkipImage(int id) {
     Image* image = cache->getImage(id);
 
     // TODO: have a mapping from image id to group index to avoid this linear search
-    for (ImageGroup& group : groups) {
+    for (auto& group : groups) {
         if (std::find(group.ids.begin(), group.ids.end(), id) != group.ids.end()) {
             if (image->skipped) {
                 group.skippedCount--;
@@ -234,7 +229,7 @@ void Application::toggleSkipImage(int id) {
 void Application::toggleSaveImage(int id) {
     Image* image = cache->getImage(id);
 
-    for (ImageGroup& group : groups) {
+    for (auto& group : groups) {
         if (std::find(group.ids.begin(), group.ids.end(), id) != group.ids.end()) {
             if (image->saved) {
                 group.savedCount--;

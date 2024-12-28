@@ -3,11 +3,11 @@
 #include <filesystem>
 #include <functional>
 #include <glm/glm.hpp>
-#include "imageView.h"
-#include "glCommon.h"
-#include "group.h"
 #include "cache.h"
 #include "config.h"
+#include "glCommon.h"
+#include "group.h"
+#include "imageView.h"
 #include "stats.h"
 
 enum ControlPanelState {
@@ -26,7 +26,7 @@ enum ViewMode {
 
 class UI {
 public:
-    UI(GLFWwindow* window, const Config& config, const std::vector<ImageGroup>& groups, ImageCache* imageCache, GroupParameters& groupParameters, Monitor* monitor);
+    UI(GLFWwindow* window, const Config::Config& config, const std::vector<Group::ImageGroup>& groups, ImageCache* imageCache, Group::GroupParameters& groupParameters, Monitor* monitor);
     ~UI();
     void renderFrame(double elapsed);
     int getCurrentGroupIndex() const;
@@ -60,7 +60,7 @@ public:
     std::function<void(int)> onSkipGroup;
     std::function<void(int)> onSaveGroup;
     std::function<void(int)> onResetGroup;
-    std::function<void(Config&)> onConfigUpdate;
+    std::function<void(Config::Config&)> onConfigUpdate;
 
 private:
     const glm::vec2 previewImageSize{75, 75};
@@ -75,14 +75,15 @@ private:
     const float exportTooltipWidth = 250.0f;
     const glm::vec2 statsWindowSize{400.0f, 300.0f};
     const glm::vec2 settingsWindowSize{ 600.0f, 300.0f };
+    const glm::vec2 aboutWindowSize{ 300.0f, 100.0f };
     const float doubleClickSeconds = 0.25f;
 
-    const std::vector<ImageGroup>& groups;
-    const Config& config;
+    const std::vector<Group::ImageGroup>& groups;
+    const Config::Config& config;
 
     GLFWwindow* window;
     ImageViewer* imageViewer[2];
-    GroupParameters& groupParameters;
+    Group::GroupParameters& groupParameters;
     ImageCache* imageCache;
     Monitor* monitor;
     glm::ivec2 imageTargetSize;
@@ -94,6 +95,7 @@ private:
     bool showSettingsWindow = false;
     bool settingsWindowFirstOpen = false;
     float previewProgress = 0.0f;
+    bool showAboutWindow = false;
 
     ControlPanelState controlPanelState = ControlPanel_NothingLoaded;
     ControlPanelState prevControlPanelState = ControlPanel_NothingLoaded;
@@ -113,6 +115,7 @@ private:
     void renderPreviewProgress();
     void renderStatsWindow();
     void renderSettingsWindow();
+    void renderAboutWindow();
 
     void selectImage(int imageView, int id);
     bool mouseOverlappingImage(int imageView);

@@ -1,14 +1,14 @@
 #include <filesystem>
-#include <iostream>
-#include <thread>
 #include <fstream>
+#include <iostream>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image_resize2.h>
-#include "glCommon.h"
-#include "cache.h"
+#include <thread>
 #include <TinyEXIF.h>
+#include "cache.h"
+#include "glCommon.h"
 
 namespace fs = std::filesystem;
 
@@ -30,7 +30,7 @@ ImageCache::ImageCache(int capacity) : cacheCapacity(capacity) {
 	}
 
 	// Create the PBOs usable for texture uploads
-	 //TODO: is this an appropriate number of PBOs given the number of threads?
+	// TODO: is this an appropriate number of PBOs given the number of threads?
 	int pboCount = imageLoadThreads;
 	for (int i = 0; i < pboCount; i++) {
 		PBOQueueEntry entry{
@@ -113,7 +113,7 @@ void ImageCache::frameUpdate() {
 	processPendingPBOQueue();
 	processPendingImageQueue();
 	processTextureQueue();
-	assert(textureIds.size() <= cacheCapacity && std::format("Number of in-use textures ({}) has exceeded cache capacity ({}).", textureIds.size(), cacheCapacity).c_str());
+	assert(textureIds.size() <= cacheCapacity && "Number of in-use textures has exceeded cache capacity.");
 }
 
 void ImageCache::updateCapacity(int capacity) {
@@ -138,11 +138,11 @@ const std::map<int, Image>& ImageCache::getImages() const {
 	return images;
 }
 
-bool ImageCache::previewLoadingComplete() {
+bool ImageCache::previewLoadingComplete() const {
 	return previewsLoaded.size() == images.size();
 }
 
-float ImageCache::getPreviewLoadProgress() {
+float ImageCache::getPreviewLoadProgress() const {
 	return previewsLoaded.size() / (float)images.size();
 }
 

@@ -143,8 +143,8 @@ public:
 	*/
 	void startInitialTextureLoads();
 
-	bool previewLoadingComplete();
-	float getPreviewLoadProgress();
+	bool previewLoadingComplete() const;
+	float getPreviewLoadProgress() const;
 
 	void getUIData(ImageCacheUIData& data);
 

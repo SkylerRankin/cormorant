@@ -1,6 +1,6 @@
-#include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <iostream>
 #include "imageView.h"
 
 ImageViewer::ImageViewer(const std::map<int, Image>& images) : images(images) {

@@ -1,9 +1,8 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "cache.h"
-#include "glCommon.h"
 #include "frame_buffer.h"
-#include "cache.h"
+#include "glCommon.h"
 
 class ImageViewer {
 public:
@@ -25,7 +24,7 @@ private:
 
 	const float zoomSpeed = 0.75f;
 	// Unit is %distance per second
-	float zoomLag = 8.0f;
+	const float zoomLag = 8.0f;
 	float currentZoom = 0.0f;
 	float targetZoom = 0.0f;
 	bool animatingZoom = false;
