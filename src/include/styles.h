@@ -51,6 +51,10 @@ void setGlobalStyles() {
 
 	style.Colors[ImGuiCol_PlotHistogram] = Colors::green;
 
+	style.Colors[ImGuiCol_ResizeGrip] = Colors::gray2;
+	style.Colors[ImGuiCol_ResizeGripHovered] = Colors::gray3;
+	style.Colors[ImGuiCol_ResizeGripActive] = Colors::green;
+
 	style.ChildRounding = 4.0f;
 	style.FrameRounding = 2.0f;
 }

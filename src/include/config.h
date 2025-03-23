@@ -11,7 +11,8 @@ namespace Config {
 		KeyAction_Reset = 4,
 		KeyAction_ToggleHideSkipped = 5,
 		KeyAction_ToggleLockMovement = 6,
-		KeyAction_Count = 7
+		KeyAction_ReturnToGroups = 7,
+		KeyAction_Count = 8
 	};
 
 	struct Config {
@@ -41,6 +42,8 @@ namespace Config {
 			keyToAction.emplace(GLFW_KEY_H, KeyAction_ToggleHideSkipped);
 
 			keyToAction.emplace(GLFW_KEY_L, KeyAction_ToggleLockMovement);
+
+			keyToAction.emplace(GLFW_KEY_ESCAPE, KeyAction_ReturnToGroups);
 		}
 
 		void update(const Config& source) {

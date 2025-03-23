@@ -31,6 +31,7 @@ namespace {
 		bool imageViewMovementLocked = true;
 		bool hideSkippedImages = true;
 		bool exportInProgress = false;
+		bool resetZoomOnChange = true;
 
 		// Data used to defer UI updates until after frame is rendered
 		bool openDirectoryPicker = false;
@@ -94,7 +95,7 @@ void UI::inputKey(int key) {
 		case Config::KeyAction_Next:
 			if (uiState.viewMode == ViewMode_Single) {
 				goToNextUnskippedImage(0);
-			} else if (uiState.viewMode == ViewMode_ManualCompare) {
+			} else if (uiState.viewMode == ViewMode_Double) {
 				if (mouseOverlappingImage(0)) {
 					goToNextUnskippedImage(0);
 				} else if (mouseOverlappingImage(1)) {
@@ -105,7 +106,7 @@ void UI::inputKey(int key) {
 		case Config::KeyAction_Previous:
 			if (uiState.viewMode == ViewMode_Single) {
 				goToPreviousUnskippedImage(0);
-			} else if (uiState.viewMode == ViewMode_ManualCompare) {
+			} else if (uiState.viewMode == ViewMode_Double) {
 				if (mouseOverlappingImage(0)) {
 					goToPreviousUnskippedImage(0);
 				} else if (mouseOverlappingImage(1)) {
@@ -144,13 +145,17 @@ void UI::inputKey(int key) {
 			uiState.hideSkippedImages = !uiState.hideSkippedImages;
 			break;
 		case Config::KeyAction_ToggleLockMovement:
-			if (uiState.viewMode == ViewMode_ManualCompare) {
+			if (uiState.viewMode == ViewMode_Double) {
 				uiState.imageViewMovementLocked = !uiState.imageViewMovementLocked;
 				if (uiState.imageViewMovementLocked) {
 					imageViewer[0]->resetTransform();
 					imageViewer[1]->resetTransform();
 				}
 			}
+			break;
+		case Config::KeyAction_ReturnToGroups:
+			controlPanelState = ControlPanel_ShowGroups;
+			selectedImages.fill(-1);
 			break;
 		case Config::KeyAction_Count:
 			break;
@@ -169,12 +174,12 @@ void UI::inputClick(int button, int action, int mods) {
 			if (elapsed <= doubleClickSeconds && mouseX == inputState.leftClickStart.x && mouseY == inputState.leftClickStart.y) {
 				if (mouseOverlappingImage(0)) {
 					imageViewer[0]->resetTransform();
-					if (uiState.viewMode == ViewMode_ManualCompare && uiState.imageViewMovementLocked) {
+					if (uiState.viewMode == ViewMode_Double && uiState.imageViewMovementLocked) {
 						imageViewer[1]->resetTransform();
 					}
 				} else if (mouseOverlappingImage(1)) {
 					imageViewer[1]->resetTransform();
-					if (uiState.viewMode == ViewMode_ManualCompare && uiState.imageViewMovementLocked) {
+					if (uiState.viewMode == ViewMode_Double && uiState.imageViewMovementLocked) {
 						imageViewer[0]->resetTransform();
 					}
 				}
@@ -357,7 +362,7 @@ void UI::renderFrame(double elapsed) {
 
 	if (uiState.viewMode == ViewMode_Single) {
 		renderSingleImageView();
-	} else if (uiState.viewMode == ViewMode_ManualCompare) {
+	} else if (uiState.viewMode == ViewMode_Double) {
 		renderCompareImageView();
 	}
 
@@ -397,7 +402,7 @@ void UI::renderFrame(double elapsed) {
 			// Updated from compare to single, so let left image become the single image automatically.
 			// The right image is deselected.
 			selectedImages[1] = -1;
-		} else if (uiState.viewMode == ViewMode_ManualCompare) {
+		} else if (uiState.viewMode == ViewMode_Double) {
 			// Updated from single to compare, so the single image becomes the left image automatically.
 			// Select the next non-skipped image for the right image.
 			selectImage(1, selectedImages[0]);
@@ -626,7 +631,7 @@ void UI::renderControlPanelFiles() {
 	if (ImGui::CollapsingHeader("Options")) {
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, previousWindowPadding);
 
-		const char* viewingModes[] = { "Single Image", "Manual Compare" };
+		const char* viewingModes[] = { "Single", "Side by Side" };
 
 		ImGui::SetNextItemWidth(viewModeComboWidth);
 		if (ImGui::BeginCombo("##viewing_mode", viewingModes[(int)uiState.viewMode], 0)) {
@@ -662,6 +667,8 @@ void UI::renderControlPanelFiles() {
 		if (uiState.viewMode == ViewMode_Single) {
 			ImGui::EndDisabled();
 		}
+
+		ImGui::Checkbox("Reset zoom on change", &uiState.resetZoomOnChange);
 
 		ImGui::PopStyleVar();
 	}
@@ -752,7 +759,7 @@ void UI::renderControlPanelFiles() {
 				ImGui::PopStyleColor();
 			}
 
-			if (uiState.viewMode == ViewMode_ManualCompare && (imageID == hoveredChildIndex || imageID == selectedImages[0] || imageID == selectedImages[1])) {
+			if (uiState.viewMode == ViewMode_Double && (imageID == hoveredChildIndex || imageID == selectedImages[0] || imageID == selectedImages[1])) {
 				const float xOffset = rowWidth - compareButtonSize.x * 2 - compareButtonSpacing;
 				const float yOffset = controlPadding + (previewImageSize.x / 2.0f) - (compareButtonSize.y / 2.0f);
 
@@ -1278,23 +1285,25 @@ void UI::renderSettingsWindow() {
 	if (ImGui::CollapsingHeader("Key Bindings")) {
 		ImGui::BeginTable("##settings_key_table", 2, ImGuiTableFlags_SizingFixedFit, ImVec2(0.0f, 0.0f));
 
-		const char* keyActions[7] = {
+		const char* keyActions[8] = {
 			"Save image",
 			"Skip image",
 			"Go to next image",
 			"Go to previous image",
 			"Reset image zoom",
 			"Toggle \"Hide skipped images\"",
-			"Toggle \"Lock movement\""
+			"Toggle \"Lock movement\"",
+			"Return to image groups"
 		};
-		const char* keyBindings[7][4] = {
+		const char* keyBindings[8][4] = {
 			{ "Space", "Enter", "1", nullptr },
 			{ "Backspace", "X", "2", nullptr },
 			{ "Down arrow", "S", nullptr },
 			{ "Up arrow", "W", nullptr },
 			{ "R", "3", nullptr },
 			{ "H", nullptr },
-			{ "L", nullptr }
+			{ "L", nullptr },
+			{ "Escape", nullptr }
 		};
 
 		for (int i = 0; i < Config::KeyAction_Count; i++) {
@@ -1345,11 +1354,19 @@ void UI::selectImage(int imageView, int id) {
 	selectedImages[imageView] = id;
 	imageViewer[imageView]->setImage(id);
 
-	if (id != -1) onImageSelected(id);
+	if (id != -1) {
+		onImageSelected(id);
 
-	if (uiState.viewMode == ViewMode_Single) {
-		imageViewer[imageView]->resetTransform();
-	} else if (uiState.viewMode == ViewMode_ManualCompare) {
+		if (uiState.resetZoomOnChange) {
+			imageViewer[imageView]->resetTransform();
+			if (uiState.viewMode == ViewMode_Double && uiState.imageViewMovementLocked) {
+				int otherView = imageView == 1 ? 0 : 1;
+				imageViewer[otherView]->resetTransform();
+			}
+		}
+	}
+
+	if (uiState.viewMode == ViewMode_Double) {
 		// The image in the other view needs to be selected as well to avoid it being
 		// evicted from the cache.
 		int otherView = imageView == 1 ? 0 : 1;

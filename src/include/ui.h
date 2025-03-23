@@ -21,7 +21,7 @@ enum ControlPanelState {
 
 enum ViewMode {
     ViewMode_Single = 0,
-    ViewMode_ManualCompare = 1,
+    ViewMode_Double = 1,
 };
 
 class UI {
